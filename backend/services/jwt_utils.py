@@ -73,6 +73,15 @@ def decode_token(token: str) -> Optional[Dict]:
 
     Returns:
         Dict: Decoded payload if valid, None if invalid/expired
+        
+        Payload includes:
+        - bank_token: The underlying bank access token (alias for access_token)
+        - access_token: The underlying bank access token  
+        - client_id: Team/client ID
+        - token_type: "bearer"
+        - expires_in: Token expiry in seconds
+        - iat: Issued at timestamp
+        - exp: Expiration timestamp
 
     Raises:
         jwt.ExpiredSignatureError: Token has expired
@@ -81,6 +90,11 @@ def decode_token(token: str) -> Optional[Dict]:
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         logger.info(f"Successfully decoded JWT token for client {payload.get('client_id')}")
+        
+        # Add bank_token alias for compatibility with new BankService
+        if "access_token" in payload and "bank_token" not in payload:
+            payload["bank_token"] = payload["access_token"]
+        
         return payload
     except jwt.ExpiredSignatureError:
         logger.warning("JWT token has expired")

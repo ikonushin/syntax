@@ -11,11 +11,14 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status, Body
+from fastapi import APIRouter, HTTPException, status, Body, Depends
 from pydantic import BaseModel
+from sqlmodel import Session
 
 from services.auth_service import authenticate_with_bank, make_authenticated_request
-from services.jwt_utils import encode_token
+from services.jwt_utils import encode_token, decode_token
+from services.bank_service import BankService
+from database import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -450,4 +453,106 @@ async def get_banks(access_token: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при получении списка банков"
+        )
+
+
+class RevokeConsentRequest(BaseModel):
+    """Request to revoke a consent."""
+    access_token: str
+    consent_id: str
+    bank_id: str
+
+
+@router.delete(
+    "/consents/{consent_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Revoke consent (disconnect bank)",
+    description="Revoke bank consent when user disconnects a bank. Calls DELETE /account-consents/{consent_id} on bank API."
+)
+async def revoke_consent(
+    consent_id: str,
+    bank_id: str,
+    access_token: str,
+    session: Session = Depends(get_session)
+):
+    """
+    Revoke a consent to disconnect a bank.
+    
+    This endpoint is called when user clicks "Disconnect" button in bank management UI.
+    It calls DELETE /account-consents/{consent_id} on the bank API and updates
+    consent status in database.
+    
+    **Path parameters:**
+    - `consent_id`: Consent ID to revoke
+    
+    **Query parameters:**
+    - `bank_id`: Bank name (abank|sbank|vbank)
+    - `access_token`: JWT session token
+    
+    **Returns:**
+    - Success message with revocation status
+    
+    **Errors:**
+    - 400: Missing required fields
+    - 401: Invalid token
+    - 404: Consent not found
+    - 503: Bank API unavailable
+    """
+    if not consent_id or not bank_id or not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="consent_id, bank_id, and access_token are required"
+        )
+    
+    try:
+        bank_id_lower = bank_id.lower()
+        logger.info(f"🔍 REVOKE DEBUG: Revoking consent {consent_id} for {bank_id_lower}")
+        
+        # Validate bank_id
+        valid_banks = ['vbank', 'abank', 'sbank']
+        if bank_id_lower not in valid_banks:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid bank_id. Must be one of: {', '.join(valid_banks)}"
+            )
+        
+        # Decode JWT to get bank token
+        try:
+            token_data = decode_token(access_token)
+            bank_token = token_data.get("bank_token")
+            if not bank_token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token: no bank token found"
+                )
+        except Exception as e:
+            logger.error(f"🔍 REVOKE DEBUG: Token decode error: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token"
+            )
+        
+        # Initialize bank service
+        bank_service = BankService(bank_id_lower, session)
+        
+        # Call bank API to revoke consent
+        result = await bank_service.revoke_consent(bank_token, consent_id)
+        
+        logger.info(f"🔍 REVOKE DEBUG: Successfully revoked consent {consent_id}")
+        
+        return {
+            "status": "success",
+            "message": "Согласие успешно отозвано",
+            "consent_id": consent_id,
+            "bank_id": bank_id_lower,
+            "details": result
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🔍 REVOKE DEBUG: Unexpected error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при отзыве согласия"
         )

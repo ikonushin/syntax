@@ -93,13 +93,7 @@ export function TransactionsPage() {
     )
   }
 
-  const handleConnectBank = async (bankId) => {
-    // TODO: Реальный запрос на создание consent
-    // const response = await fetch('/api/consents', {
-    //   method: 'POST',
-    //   body: JSON.stringify({ bank_id: bankId, user_id: ... })
-    // })
-    
+    const handleConnectBank = async (bankId) => {
     // Проверяем, не подключен ли уже такой банк
     if (connectedBanks.find(b => b.id === bankId)) {
       showToast(`Банк уже подключен`, 'info')
@@ -118,26 +112,102 @@ export function TransactionsPage() {
       return
     }
 
-    const newBank = {
-      id: bankId,
-      name: config.name,
-      icon: config.icon,
-      status: 'active',
-      transactionsCount: 0,
-      visible: true
+    try {
+      const accessToken = localStorage.getItem('accessToken')
+      if (!accessToken) {
+        showToast('Ошибка: токен авторизации не найден', 'error')
+        return
+      }
+      
+      // Получаем user_id из токена или localStorage
+      const userId = `team-286-${Math.floor(Math.random() * 10) + 1}` // TODO: получать из контекста
+      
+      // Создаем согласие через API
+      showToast(`Подключаем ${config.name}...`, 'info')
+      
+      const response = await axios.post(`${API_URL}/api/consents`, {
+        access_token: accessToken,
+        user_id: userId,
+        bank_id: bankId
+      })
+      
+      console.log('✅ Consent created:', response.data)
+      
+      const consentId = response.data.consent_id
+      const status = response.data.status
+      
+      // Если SBank и требует ручного подтверждения
+      if (status === 'pending' && response.data.redirect_url) {
+        showToast(
+          `${config.name}: необходимо подтвердить согласие в банке`,
+          'info'
+        )
+        // Можно открыть redirect_url в новом окне
+        // window.open(response.data.redirect_url, '_blank')
+      }
+      
+      const newBank = {
+        id: bankId,
+        name: config.name,
+        icon: config.icon,
+        status: status === 'pending' ? 'pending' : 'active',
+        transactionsCount: 0,
+        visible: true,
+        consentId: consentId // Сохраняем consent_id для отзыва
+      }
+      
+      setConnectedBanks(prev => [...prev, newBank])
+      setShowBankSettings(false)
+      showToast(`Банк ${newBank.name} подключен`, 'success')
+      
+    } catch (error) {
+      console.error('❌ Error creating consent:', error)
+      showToast(
+        `Ошибка при подключении банка: ${error.response?.data?.detail || error.message}`,
+        'error'
+      )
     }
-    setConnectedBanks(prev => [...prev, newBank])
-    setShowBankSettings(false)
-    showToast(`Банк ${newBank.name} подключен`, 'success')
   }
 
-  const handleDisconnectBank = (bankId) => {
+  const handleDisconnectBank = async (bankId) => {
     const bank = connectedBanks.find(b => b.id === bankId)
     if (!bank) return
     
-    if (window.confirm(`Отключить банк ${bank.name}?`)) {
-      setConnectedBanks(prev => prev.filter(b => b.id !== bankId))
-      showToast(`Банк ${bank.name} отключен`, 'info')
+    if (window.confirm(`Отключить банк ${bank.name}? Согласие будет отозвано.`)) {
+      try {
+        const accessToken = localStorage.getItem('accessToken')
+        if (!accessToken) {
+          showToast('Ошибка: токен авторизации не найден', 'error')
+          return
+        }
+        
+        // Получаем consent_id для этого банка (предполагаем, что он хранится в bank объекте)
+        const consentId = bank.consentId || bank.consent_id || `consent-${bankId}`
+        
+        // Вызываем DELETE /api/consents/{consent_id}
+        const response = await axios.delete(
+          `${API_URL}/api/consents/${consentId}`,
+          {
+            params: {
+              bank_id: bankId,
+              access_token: accessToken
+            }
+          }
+        )
+        
+        console.log('✅ Consent revoked:', response.data)
+        
+        // Удаляем банк из списка подключенных
+        setConnectedBanks(prev => prev.filter(b => b.id !== bankId))
+        showToast(`Банк ${bank.name} отключен, согласие отозвано`, 'success')
+        
+      } catch (error) {
+        console.error('❌ Error revoking consent:', error)
+        showToast(
+          `Ошибка при отключении банка: ${error.response?.data?.detail || error.message}`,
+          'error'
+        )
+      }
     }
   }
 
