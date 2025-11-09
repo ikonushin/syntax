@@ -1,0 +1,199 @@
+/* Banks Page Styles */
+
+.banks-wrapper {
+  min-height: 100vh;
+  background: #FFFFFF;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.banks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: #FFFFFF;
+  border-bottom: 2px solid #FFD700;
+}
+
+.banks-header h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1A2233;
+  margin: 0;
+}
+
+.banks-header p {
+  font-size: 13px;
+  color: #666;
+  margin: 5px 0 0 0;
+}
+
+.banks-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.section {
+  margin-bottom: 40px;
+}
+
+.section-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1A2233;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 20px 0;
+}
+
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 10px;
+  max-width: 400px;
+}
+
+.user-button {
+  padding: 15px;
+  background: #F0F0F0;
+  border: 2px solid #E0E0E0;
+  border-radius: 6px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A2233;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.user-button:hover {
+  background: #FFF9E0;
+  border-color: #FFD700;
+}
+
+.user-button.active {
+  background: #FFD700;
+  border-color: #FFD700;
+  color: #1A2233;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.banks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.bank-card {
+  background: #FFFFFF;
+  border: 2px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.bank-card:hover {
+  border-color: #FFD700;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
+}
+
+.bank-icon {
+  font-size: 40px;
+  margin-bottom: 15px;
+}
+
+.bank-card h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  color: #1A2233;
+  margin: 0 0 15px 0;
+}
+
+.btn-connect {
+  padding: 12px 20px;
+  background: #FFD700;
+  color: #1A2233;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  width: 100%;
+}
+
+.btn-connect:hover:not(:disabled) {
+  background: #FFC800;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.btn-connect:disabled {
+  background: #D0D0D0;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.btn-connect.connected {
+  background: #2E7D32;
+  color: #FFFFFF;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .banks-content {
+    padding: 20px;
+  }
+
+  .banks-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-grid {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .banks-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .banks-header h1 {
+    font-size: 20px;
+  }
+
+  .user-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .user-button {
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .bank-card {
+    padding: 15px;
+  }
+
+  .bank-icon {
+    font-size: 30px;
+  }
+}

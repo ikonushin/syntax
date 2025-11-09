@@ -1,0 +1,327 @@
+/* ========================================
+   TRANSACTIONS SCREEN STYLES
+   ======================================== */
+
+.transactions-wrapper {
+  min-height: 100vh;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+.transactions-header {
+  background: linear-gradient(135deg, #1A2233 0%, #2D3E5F 100%);
+  color: #FFFFFF;
+  padding: 24px;
+  text-align: center;
+}
+
+.transactions-header h1 {
+  margin: 0;
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.transactions-header p {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+  font-weight: 300;
+}
+
+/* MAIN CONTENT */
+.transactions-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding-bottom: 80px;
+}
+
+/* TRANSACTION ITEM */
+.transaction-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.transaction-item:hover {
+  border-color: #FFD700;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.1);
+  background: #FFF9E0;
+}
+
+.transaction-item.selected {
+  background: #FFF9E0;
+  border-color: #FFD700;
+  border-width: 2px;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.15);
+}
+
+/* CHECKBOX */
+.transaction-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #FFD700;
+  flex-shrink: 0;
+}
+
+/* TRANSACTION INFO */
+.transaction-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.transaction-date {
+  font-size: 12px;
+  color: #9CA3AF;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transaction-sender {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A2233;
+  font-family: 'Oswald', sans-serif;
+}
+
+.transaction-description {
+  font-size: 13px;
+  color: #6B7280;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* AMOUNT */
+.transaction-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1A2233;
+  font-family: 'Oswald', sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* STICKY BOTTOM BAR */
+.transactions-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #FFFFFF;
+  border-top: 1px solid #E5E7EB;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+}
+
+.transactions-sticky-bar.hidden {
+  display: none;
+}
+
+.selection-info {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A2233;
+  font-family: 'Oswald', sans-serif;
+}
+
+.selection-info .count {
+  color: #FFD700;
+  font-weight: 700;
+}
+
+/* CREATE RECEIPT BUTTON */
+.btn-create-receipt {
+  background: #FFD700;
+  color: #1A2233;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Oswald', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+}
+
+.btn-create-receipt:hover:not(:disabled) {
+  background: #FFC107;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(255, 215, 0, 0.3);
+}
+
+.btn-create-receipt:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-create-receipt:disabled {
+  background: #E5E7EB;
+  color: #9CA3AF;
+  cursor: not-allowed;
+}
+
+/* EMPTY STATE */
+.transactions-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: #9CA3AF;
+}
+
+.transactions-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.transactions-empty h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #6B7280;
+  margin: 0 0 8px 0;
+  font-family: 'Oswald', sans-serif;
+}
+
+.transactions-empty p {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin: 0;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .transactions-header h1 {
+    font-size: 22px;
+  }
+  
+  .transactions-content {
+    padding: 16px;
+    padding-bottom: 80px;
+  }
+  
+  .transaction-item {
+    padding: 12px;
+  }
+  
+  .transaction-sender {
+    font-size: 14px;
+  }
+  
+  .transaction-description {
+    font-size: 12px;
+  }
+  
+  .transaction-amount {
+    font-size: 15px;
+  }
+  
+  .transactions-sticky-bar {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+  
+  .selection-info {
+    font-size: 13px;
+  }
+  
+  .btn-create-receipt {
+    padding: 10px 24px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .transactions-wrapper {
+    min-height: 100vh;
+  }
+  
+  .transactions-header {
+    padding: 16px;
+  }
+  
+  .transactions-header h1 {
+    font-size: 18px;
+  }
+  
+  .transactions-header p {
+    font-size: 12px;
+  }
+  
+  .transactions-content {
+    padding: 12px;
+    padding-bottom: 100px;
+  }
+  
+  .transaction-item {
+    gap: 12px;
+    padding: 12px;
+  }
+  
+  .transaction-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .transaction-date {
+    font-size: 11px;
+  }
+  
+  .transaction-sender {
+    font-size: 13px;
+  }
+  
+  .transaction-description {
+    font-size: 11px;
+  }
+  
+  .transaction-amount {
+    font-size: 14px;
+  }
+  
+  .transactions-sticky-bar {
+    flex-wrap: wrap;
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .transactions-sticky-bar.hidden {
+    display: none;
+  }
+  
+  .selection-info {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+  }
+  
+  .btn-create-receipt {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 12px;
+    min-width: 150px;
+  }
+}

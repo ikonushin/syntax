@@ -1,0 +1,226 @@
+/* Shared Page Styles */
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E0E0E0;
+  margin-bottom: 30px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.page-header-left h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1A2233;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.page-header-left p {
+  font-size: 13px;
+  color: #666;
+  margin: 5px 0 0 0;
+}
+
+.page-header-right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-nav {
+  padding: 10px 15px;
+  background: transparent;
+  color: #1A2233;
+  border: 1px solid #D0D0D0;
+  border-radius: 6px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.btn-nav:hover {
+  background: #FFF9E0;
+  border-color: #FFD700;
+}
+
+.btn-logout {
+  padding: 10px 15px;
+  background: transparent;
+  color: #C62828;
+  border: 1px solid #EF5350;
+  border-radius: 6px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.btn-logout:hover {
+  background: #FFEBEE;
+  border-color: #C62828;
+  color: #C62828;
+}
+
+.page-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 30px 30px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.empty-state h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px;
+  color: #1A2233;
+  margin: 0 0 10px 0;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #999;
+}
+
+.error-message,
+.success-message {
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  animation: slideInUp 0.3s ease-out;
+}
+
+.error-message {
+  background: #FFEBEE;
+  border: 1px solid #EF5350;
+  color: #C62828;
+}
+
+.success-message {
+  background: #E8F5E9;
+  border: 1px solid #66BB6A;
+  color: #2E7D32;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 14px 20px;
+  background: #1A2233;
+  color: #FFFFFF;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideInUp 0.3s ease-out;
+  z-index: 1000;
+  font-size: 13px;
+}
+
+.toast.toast-success {
+  background: #2E7D32;
+}
+
+.toast.toast-error {
+  background: #C62828;
+}
+
+.toast.toast-warning {
+  background: #F57F17;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .page-header-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .page-content {
+    padding: 0 15px 15px;
+  }
+
+  .btn-nav,
+  .btn-logout {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header {
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+
+  .page-header-left h1 {
+    font-size: 20px;
+  }
+
+  .page-header-left p {
+    font-size: 12px;
+  }
+
+  .page-header-right {
+    gap: 8px;
+  }
+
+  .btn-nav,
+  .btn-logout {
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+
+  .toast {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}

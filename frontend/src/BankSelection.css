@@ -1,0 +1,438 @@
+/* ============================================
+   BANK SELECTION SCREEN - SYNTAX BRANDING
+   ============================================ */
+
+.bank-selection-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
+  padding: 40px 20px;
+  font-family: 'Oswald', sans-serif;
+  animation: fadeIn 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header section */
+.bank-selection-header {
+  text-align: center;
+  margin-bottom: 50px;
+  animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bank-selection-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1A2233;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.bank-selection-header p {
+  font-size: 1rem;
+  color: #666;
+  margin: 10px 0 0 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+}
+
+/* Content container */
+.bank-selection-content {
+  max-width: 900px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 50px;
+}
+
+/* ========================
+   USER SELECTION SECTION
+   ======================== */
+.user-selection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  animation: scaleIn 0.6s ease-out 0.1s both;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.section-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1A2233;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #FFD700;
+  display: inline-block;
+}
+
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 12px;
+  max-width: 600px;
+}
+
+.user-button {
+  height: 60px;
+  width: 60px;
+  border: 2px solid #E0E0E0;
+  background: #FFFFFF;
+  color: #1A2233;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'Oswald', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-button:hover {
+  border-color: #FFD700;
+  color: #FFD700;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
+}
+
+.user-button.active {
+  background: #FFD700;
+  color: #1A2233;
+  border-color: #FFD700;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+  transform: scale(1.05);
+}
+
+.user-button:active {
+  transform: scale(0.98);
+}
+
+/* ========================
+   BANK SELECTION SECTION
+   ======================== */
+.bank-selection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  animation: scaleIn 0.6s ease-out 0.2s both;
+}
+
+.banks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.bank-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 30px;
+  border: 2px solid #E0E0E0;
+  background: #FFFFFF;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  min-height: 180px;
+  position: relative;
+}
+
+.bank-card:hover {
+  border-color: #FFD700;
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.25);
+}
+
+.bank-card.active {
+  background: linear-gradient(135deg, #FFFEF5 0%, #FFFFF0 100%);
+  border-color: #FFD700;
+  border-width: 3px;
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.3),
+              inset 0 0 20px rgba(255, 215, 0, 0.1);
+}
+
+.bank-icon {
+  font-size: 3rem;
+  line-height: 1;
+  transition: all 0.3s ease;
+}
+
+.bank-card:hover .bank-icon {
+  transform: scale(1.1);
+}
+
+.bank-card.active .bank-icon {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+}
+
+.bank-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1A2233;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.bank-card:hover .bank-name {
+  color: #FFD700;
+}
+
+.bank-description {
+  font-size: 0.85rem;
+  color: #999;
+  text-align: center;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ========================
+   ACTION BUTTON
+   ======================== */
+.action-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+  animation: slideUp 0.6s ease-out 0.3s both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.submit-button {
+  padding: 16px 60px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #1A2233;
+  background: linear-gradient(135deg, #FFD700 0%, #FFC700 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+  min-width: 280px;
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: left 0.3s ease;
+}
+
+.submit-button:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.4);
+}
+
+.submit-button:active:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Loading state */
+.submit-button.loading {
+  position: relative;
+  color: transparent;
+}
+
+.submit-button.loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #1A2233;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Success message */
+.success-message {
+  color: #4CAF50;
+  font-size: 0.95rem;
+  text-align: center;
+  margin-top: 15px;
+  padding: 12px;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid #4CAF50;
+  animation: slideUp 0.4s ease-out;
+}
+
+/* Error message */
+.error-message {
+  color: #F44336;
+  font-size: 0.95rem;
+  text-align: center;
+  margin-top: 15px;
+  padding: 12px;
+  background: rgba(244, 67, 54, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid #F44336;
+  animation: shake 0.5s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
+
+/* ========================
+   RESPONSIVE DESIGN
+   ======================== */
+
+@media (max-width: 768px) {
+  .bank-selection-wrapper {
+    padding: 30px 15px;
+  }
+
+  .bank-selection-header h1 {
+    font-size: 2rem;
+    letter-spacing: 1px;
+  }
+
+  .bank-selection-content {
+    gap: 40px;
+  }
+
+  .banks-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .users-grid {
+    justify-content: center;
+  }
+
+  .submit-button {
+    min-width: 240px;
+    padding: 14px 40px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .bank-selection-wrapper {
+    padding: 20px 10px;
+  }
+
+  .bank-selection-header h1 {
+    font-size: 1.6rem;
+    letter-spacing: 0.5px;
+  }
+
+  .bank-selection-header p {
+    font-size: 0.9rem;
+  }
+
+  .bank-card {
+    padding: 20px;
+    min-height: 150px;
+  }
+
+  .bank-icon {
+    font-size: 2.5rem;
+  }
+
+  .bank-name {
+    font-size: 1.1rem;
+  }
+
+  .users-grid {
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+  }
+
+  .user-button {
+    height: 50px;
+    width: 50px;
+    font-size: 1rem;
+  }
+
+  .submit-button {
+    width: 100%;
+    min-width: auto;
+  }
+}
