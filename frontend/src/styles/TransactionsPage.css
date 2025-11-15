@@ -519,6 +519,15 @@
   border: 2px solid #FFD700;
 }
 
+.transaction-item.has-receipt {
+  border-left: 4px solid #4CAF50;
+  background: #F1F8F4;
+}
+
+.transaction-item.has-receipt:hover {
+  background: #E8F5E9;
+}
+
 .transaction-item input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -532,12 +541,32 @@
   gap: 4px;
 }
 
+.tx-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .tx-date {
   font-family: 'Oswald', sans-serif;
   font-size: 12px;
   font-weight: 600;
   color: #1A2233;
   text-transform: uppercase;
+}
+
+.receipt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #4CAF50;
+  color: #FFFFFF;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tx-sender {
@@ -555,9 +584,16 @@
 .tx-amount {
   font-size: 16px;
   font-weight: 600;
-  color: #1A2233;
   min-width: 100px;
   text-align: right;
+}
+
+.tx-amount.income {
+  color: #4CAF50;
+}
+
+.tx-amount.expense {
+  color: #F44336;
 }
 
 .sticky-action-bar {

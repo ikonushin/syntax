@@ -25,6 +25,10 @@ export function ReceiptsPage() {
   const [expandedReceiptId, setExpandedReceiptId] = useState(null)
   const [filterStatus, setFilterStatus] = useState('all')
   const [toast, setToast] = useState(null)
+  
+  // Bulk operations state
+  const [selectedReceiptIds, setSelectedReceiptIds] = useState([])
+  const [bulkActionMode, setBulkActionMode] = useState(false)
 
   // Load receipts from localStorage on mount
   useEffect(() => {
@@ -39,9 +43,20 @@ export function ReceiptsPage() {
       }
     }
     
-    // Load saved service templates
+    // Load saved service templates (from Settings page)
+    const storedPurposes = localStorage.getItem('syntax_saved_purposes')
+    if (storedPurposes) {
+      try {
+        const parsed = JSON.parse(storedPurposes)
+        setSavedServices(parsed)
+      } catch (err) {
+        console.error('❌ RECEIPTS: Failed to parse saved purposes:', err)
+      }
+    }
+    
+    // Fallback to old syntax_services key for compatibility
     const storedServices = localStorage.getItem('syntax_services')
-    if (storedServices) {
+    if (storedServices && !storedPurposes) {
       try {
         const parsed = JSON.parse(storedServices)
         setSavedServices(parsed)
@@ -56,6 +71,82 @@ export function ReceiptsPage() {
     localStorage.setItem('syntax_receipts', JSON.stringify(receipts))
     console.log('💾 RECEIPTS: Saved to localStorage:', receipts)
   }, [receipts])
+  
+  // Auto-create receipts based on rules from Settings
+  useEffect(() => {
+    const autoCreateReceipts = () => {
+      const storedRules = localStorage.getItem('syntax_auto_receipt_rules')
+      if (!storedRules || transactions.length === 0) return
+      
+      try {
+        const rules = JSON.parse(storedRules)
+        const activeRules = rules.filter(rule => rule.enabled)
+        
+        if (activeRules.length === 0) return
+        
+        const newAutoReceipts = []
+        
+        // Check each transaction against rules
+        transactions.forEach(tx => {
+          // Skip if receipt already exists for this transaction
+          const existingReceipt = receipts.find(r => r.transactionIds?.includes(tx.id))
+          if (existingReceipt) return
+          
+          // Skip expenses
+          if (tx.amount <= 0) return
+          
+          // Check rules
+          activeRules.forEach(rule => {
+            let matches = false
+            
+            if (rule.type === 'keyword') {
+              matches = tx.description?.toLowerCase().includes(rule.value.toLowerCase())
+            } else if (rule.type === 'sender') {
+              matches = tx.sender?.toLowerCase().includes(rule.value.toLowerCase())
+            }
+            
+            if (matches) {
+              // Auto-create receipt
+              const taxAmount = calculateTax(tx.amount, 'individual')
+              const receiptId = `AUTO-${Date.now()}-${tx.id}`
+              
+              const newReceipt = {
+                id: receiptId,
+                date: new Date().toISOString().split('T')[0],
+                service: rule.serviceName,
+                clientName: tx.sender || 'Не указано',
+                clientType: 'individual',
+                totalAmount: tx.amount,
+                taxAmount,
+                status: 'draft',
+                transactionIds: [tx.id],
+                transactionDate: tx.date,
+                autoCreated: true,
+                createdAt: new Date()
+              }
+              
+              newAutoReceipts.push(newReceipt)
+              console.log('🤖 AUTO-RECEIPT: Matched tx', tx.id, 'by rule:', rule.value)
+            }
+          })
+        })
+        
+        if (newAutoReceipts.length > 0) {
+          setReceipts(prev => [...newAutoReceipts, ...prev])
+          showToast(`Автоматически создано ${newAutoReceipts.length} чек(ов)`, 'info')
+        }
+      } catch (err) {
+        console.error('Error auto-creating receipts:', err)
+      }
+    }
+    
+    // Run only once after initial load
+    const hasRun = sessionStorage.getItem('auto_receipts_created')
+    if (!hasRun && transactions.length > 0) {
+      autoCreateReceipts()
+      sessionStorage.setItem('auto_receipts_created', 'true')
+    }
+  }, [transactions.length]) // Run when transactions are loaded
   
   // Initialize forms when transactions are selected
   useEffect(() => {
@@ -119,7 +210,7 @@ export function ReceiptsPage() {
     if (service && !savedServices.includes(service)) {
       const updated = [...savedServices, service]
       setSavedServices(updated)
-      localStorage.setItem('syntax_services', JSON.stringify(updated))
+      localStorage.setItem('syntax_saved_purposes', JSON.stringify(updated))
     }
   }
   
@@ -205,6 +296,80 @@ export function ReceiptsPage() {
   const deleteReceipt = (receiptId) => {
     setReceipts(receipts.filter(r => r.id !== receiptId))
     showToast('Receipt deleted', 'success')
+  }
+  
+  // Bulk selection functions
+  const toggleReceiptSelection = (receiptId) => {
+    setSelectedReceiptIds(prev => 
+      prev.includes(receiptId) 
+        ? prev.filter(id => id !== receiptId)
+        : [...prev, receiptId]
+    )
+  }
+  
+  const selectAllInCategory = () => {
+    const filteredIds = filteredReceipts.map(r => r.id)
+    setSelectedReceiptIds(filteredIds)
+  }
+  
+  const deselectAll = () => {
+    setSelectedReceiptIds([])
+  }
+  
+  const toggleBulkMode = () => {
+    setBulkActionMode(!bulkActionMode)
+    if (bulkActionMode) {
+      deselectAll()
+    }
+  }
+  
+  // Bulk operations
+  const bulkSendReceipts = async () => {
+    if (selectedReceiptIds.length === 0) {
+      showToast('No receipts selected', 'warning')
+      return
+    }
+    
+    const updatedReceipts = receipts.map(r =>
+      selectedReceiptIds.includes(r.id) && r.status === 'draft'
+        ? { ...r, status: 'sent' }
+        : r
+    )
+    setReceipts(updatedReceipts)
+    showToast(`${selectedReceiptIds.length} receipt(s) sent to tax service`, 'success')
+    deselectAll()
+    setBulkActionMode(false)
+  }
+  
+  const bulkResendReceipts = async () => {
+    if (selectedReceiptIds.length === 0) {
+      showToast('No receipts selected', 'warning')
+      return
+    }
+    
+    const updatedReceipts = receipts.map(r =>
+      selectedReceiptIds.includes(r.id) && r.status === 'sent'
+        ? { ...r, status: 'sent', resentAt: new Date() }
+        : r
+    )
+    setReceipts(updatedReceipts)
+    showToast(`${selectedReceiptIds.length} receipt(s) resent`, 'success')
+    deselectAll()
+    setBulkActionMode(false)
+  }
+  
+  const bulkDeleteReceipts = () => {
+    if (selectedReceiptIds.length === 0) {
+      showToast('No receipts selected', 'warning')
+      return
+    }
+    
+    if (window.confirm(`Delete ${selectedReceiptIds.length} receipt(s)? This action cannot be undone.`)) {
+      setReceipts(receipts.filter(r => !selectedReceiptIds.includes(r.id)))
+      showToast(`${selectedReceiptIds.length} receipt(s) deleted`, 'success')
+      deselectAll()
+      setBulkActionMode(false)
+    }
   }
 
   const exportToCSV = () => {
@@ -423,10 +588,57 @@ export function ReceiptsPage() {
                 </button>
               </div>
             </div>
-            <button className="btn-export" onClick={exportToCSV}>
-              📊 Export CSV
-            </button>
+            <div className="list-toolbar-right">
+              <button 
+                className={`btn-bulk ${bulkActionMode ? 'active' : ''}`}
+                onClick={toggleBulkMode}
+              >
+                {bulkActionMode ? '✓ Cancel Bulk' : '☑ Bulk Actions'}
+              </button>
+              <button className="btn-export" onClick={exportToCSV}>
+                📊 Export CSV
+              </button>
+            </div>
           </div>
+          
+          {/* Bulk Actions Bar */}
+          {bulkActionMode && (
+            <div className="bulk-actions-bar">
+              <div className="bulk-actions-left">
+                <button className="btn-select-all" onClick={selectAllInCategory}>
+                  Select All ({filteredReceipts.length})
+                </button>
+                <button className="btn-deselect" onClick={deselectAll}>
+                  Deselect All
+                </button>
+                <span className="selected-count">
+                  {selectedReceiptIds.length} selected
+                </span>
+              </div>
+              
+              {selectedReceiptIds.length > 0 && (
+                <div className="bulk-actions-right">
+                  {/* Send button - only for drafts */}
+                  {receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'draft').length > 0 && (
+                    <button className="btn-bulk-send" onClick={bulkSendReceipts}>
+                      ✉️ Send ({receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'draft').length})
+                    </button>
+                  )}
+                  
+                  {/* Resend button - only for sent */}
+                  {receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'sent').length > 0 && (
+                    <button className="btn-bulk-resend" onClick={bulkResendReceipts}>
+                      🔄 Resend ({receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'sent').length})
+                    </button>
+                  )}
+                  
+                  <button className="btn-bulk-delete" onClick={bulkDeleteReceipts}>
+                    🗑️ Delete ({selectedReceiptIds.length})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {filteredReceipts.length === 0 ? (
             <div className="empty-state">
@@ -436,11 +648,28 @@ export function ReceiptsPage() {
           ) : (
             <div className="receipts-table">
               {filteredReceipts.map(receipt => (
-                <div key={receipt.id} className="receipt-row">
+                <div key={receipt.id} className={`receipt-row ${selectedReceiptIds.includes(receipt.id) ? 'selected' : ''}`}>
                   <div
                     className="receipt-row-main"
-                    onClick={() => setExpandedReceiptId(expandedReceiptId === receipt.id ? null : receipt.id)}
+                    onClick={() => {
+                      if (bulkActionMode) {
+                        toggleReceiptSelection(receipt.id)
+                      } else {
+                        setExpandedReceiptId(expandedReceiptId === receipt.id ? null : receipt.id)
+                      }
+                    }}
                   >
+                    {/* Checkbox for bulk selection */}
+                    {bulkActionMode && (
+                      <div className="receipt-checkbox" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedReceiptIds.includes(receipt.id)}
+                          onChange={() => toggleReceiptSelection(receipt.id)}
+                        />
+                      </div>
+                    )}
+                    
                     <div className="receipt-info">
                       <div className="receipt-date">{receipt.date}</div>
                       <div className="receipt-service">{receipt.service}</div>

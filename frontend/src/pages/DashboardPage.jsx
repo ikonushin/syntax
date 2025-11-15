@@ -51,6 +51,12 @@ export function DashboardPage() {
           <button className="btn-nav" onClick={() => navigate('/receipts')}>
             📧 Receipts
           </button>
+          <button className="btn-nav" onClick={() => navigate('/tax-payments')}>
+            🏛 Налоги
+          </button>
+          <button className="btn-nav" onClick={() => navigate('/settings')}>
+            ⚙️ Settings
+          </button>
           <button className="btn-logout" onClick={() => {
             logout()
             navigate('/auth')

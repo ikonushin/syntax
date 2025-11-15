@@ -8,17 +8,31 @@ export function TransactionsPage() {
   const { logout, selectedBank } = useAuth()
   
   const [transactions, setTransactions] = useState([
-    { id: 1, date: '2025-11-09', amount: 5000, type: 'income', description: 'оплата за консультацию', sender: 'Иван Петров', bank: 'vbank' },
-    { id: 2, date: '2025-11-08', amount: 3500, type: 'income', description: 'проектирование веб-сайта', sender: 'ООО Рога и Копыта', bank: 'vbank' },
-    { id: 3, date: '2025-11-07', amount: 2000, type: 'income', description: 'тестирование приложения', sender: 'Мария Смирнова', bank: 'abank' },
-    { id: 4, date: '2025-11-06', amount: 7500, type: 'income', description: 'разработка API', sender: 'TechStart LLC', bank: 'abank' },
-    { id: 5, date: '2025-11-05', amount: 1200, type: 'income', description: 'помощь в отладке кода', sender: 'Алексей Васильев', bank: 'sbank' }
+    // Поступления
+    { id: 1, date: '2025-11-14', amount: 5000, type: 'income', description: 'оплата за консультацию', sender: 'Иван Петров', bank: 'vbank', hasReceipt: true },
+    { id: 2, date: '2025-11-13', amount: 3500, type: 'income', description: 'проектирование веб-сайта', sender: 'ООО Рога и Копыта', bank: 'vbank', hasReceipt: false },
+    { id: 3, date: '2025-11-12', amount: 2000, type: 'income', description: 'тестирование приложения', sender: 'Мария Смирнова', bank: 'abank', hasReceipt: true },
+    { id: 4, date: '2025-11-11', amount: 7500, type: 'income', description: 'разработка API', sender: 'TechStart LLC', bank: 'abank', hasReceipt: false },
+    { id: 5, date: '2025-11-10', amount: 1200, type: 'income', description: 'помощь в отладке кода', sender: 'Алексей Васильев', bank: 'sbank', hasReceipt: true },
+    { id: 6, date: '2025-11-09', amount: 4200, type: 'income', description: 'консультация по безопасности', sender: 'Елена Иванова', bank: 'vbank', hasReceipt: false },
+    { id: 7, date: '2025-11-08', amount: 6800, type: 'income', description: 'разработка мобильного приложения', sender: 'StartupLab', bank: 'abank', hasReceipt: true },
+    { id: 8, date: '2025-11-07', amount: 3200, type: 'income', description: 'SEO оптимизация сайта', sender: 'Веб-студия Прогресс', bank: 'sbank', hasReceipt: false },
+    
+    // Списания
+    { id: 9, date: '2025-11-14', amount: -850, type: 'expense', description: 'аренда офиса', sender: 'ООО Недвижимость+', bank: 'vbank', hasReceipt: false },
+    { id: 10, date: '2025-11-13', amount: -1200, type: 'expense', description: 'оплата интернета и связи', sender: 'МегаТелеком', bank: 'abank', hasReceipt: false },
+    { id: 11, date: '2025-11-12', amount: -3500, type: 'expense', description: 'покупка ноутбука', sender: 'ТехноМарт', bank: 'vbank', hasReceipt: false },
+    { id: 12, date: '2025-11-11', amount: -450, type: 'expense', description: 'канцелярские товары', sender: 'ОфисКомплект', bank: 'sbank', hasReceipt: false },
+    { id: 13, date: '2025-11-10', amount: -2100, type: 'expense', description: 'оплата хостинга', sender: 'HostingPro', bank: 'abank', hasReceipt: false },
+    { id: 14, date: '2025-11-09', amount: -680, type: 'expense', description: 'подписка на ПО', sender: 'Adobe', bank: 'vbank', hasReceipt: false },
+    { id: 15, date: '2025-11-08', amount: -1500, type: 'expense', description: 'реклама в соцсетях', sender: 'Meta Platforms', bank: 'abank', hasReceipt: false },
+    { id: 16, date: '2025-11-07', amount: -920, type: 'expense', description: 'банковское обслуживание', sender: 'Комиссия банка', bank: 'sbank', hasReceipt: false }
   ])
   
   const [connectedBanks, setConnectedBanks] = useState([
-    { id: 'abank', name: 'ABank', icon: '💳', status: 'active', transactionsCount: 2, visible: true },
-    { id: 'sbank', name: 'SBank', icon: '🏛️', status: 'active', transactionsCount: 1, visible: true },
-    { id: 'vbank', name: 'VBank', icon: '�', status: 'active', transactionsCount: 2, visible: true }
+    { id: 'abank', name: 'ABank', icon: '💳', status: 'active', transactionsCount: 6, visible: true },
+    { id: 'sbank', name: 'SBank', icon: '🏛️', status: 'active', transactionsCount: 3, visible: true },
+    { id: 'vbank', name: 'VBank', icon: '🏦', status: 'active', transactionsCount: 7, visible: true }
   ])
   
   const [selectedTransactions, setSelectedTransactions] = useState(new Set())
@@ -401,7 +415,7 @@ export function TransactionsPage() {
             {filteredTransactions.map(tx => (
               <div
                 key={tx.id}
-                className={`transaction-item ${selectedTransactions.has(tx.id) ? 'selected' : ''}`}
+                className={`transaction-item ${selectedTransactions.has(tx.id) ? 'selected' : ''} ${tx.hasReceipt ? 'has-receipt' : ''}`}
                 onClick={() => toggleTransaction(tx.id)}
               >
                 <input
@@ -411,11 +425,20 @@ export function TransactionsPage() {
                   onClick={(e) => e.stopPropagation()}
                 />
                 <div className="tx-content">
-                  <div className="tx-date">{tx.date}</div>
+                  <div className="tx-header">
+                    <div className="tx-date">{tx.date}</div>
+                    {tx.hasReceipt && (
+                      <span className="receipt-badge" title="Чек создан">
+                        📧 Чек создан
+                      </span>
+                    )}
+                  </div>
                   <div className="tx-sender">{tx.sender}</div>
                   {tx.description && <div className="tx-description">{tx.description}</div>}
                 </div>
-                <div className="tx-amount">{formatAmount(tx.amount)}</div>
+                <div className={`tx-amount ${tx.type === 'expense' ? 'expense' : 'income'}`}>
+                  {formatAmount(tx.amount)}
+                </div>
               </div>
             ))}
           </div>

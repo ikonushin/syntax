@@ -7,6 +7,8 @@ import { BanksPage } from './pages/BanksPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { ReceiptsPage } from './pages/ReceiptsPage'
 import { DashboardPage } from './pages/DashboardPage'
+import TaxPaymentsPage from './pages/TaxPaymentsPage'
+import SettingsPage from './pages/SettingsPage'
 import './styles/PageShared.css'
 import './index.css'
 
@@ -49,6 +51,24 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <DashboardPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/tax-payments"
+        element={
+          <PrivateRoute>
+            <TaxPaymentsPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <PrivateRoute>
+            <SettingsPage />
           </PrivateRoute>
         }
       />

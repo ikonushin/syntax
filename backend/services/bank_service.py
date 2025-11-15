@@ -486,3 +486,243 @@ class BankService:
             logger.warning(f"No active consent found for {client_id} at {self.bank_name}")
         
         return consent
+    
+    async def create_payment_consent(
+        self,
+        bank_token: str,
+        client_id: str,
+        amount: float,
+        recipient_account: str,
+        recipient_name: str,
+        recipient_inn: str,
+        recipient_kpp: str,
+        recipient_bik: str,
+        payment_purpose: str,
+        requesting_bank: str = "team286"
+    ) -> Dict:
+        """
+        Create payment consent for domestic transfer.
+        
+        Flow per OpenBanking documentation:
+        - POST /domestic-payment-consents
+        - Headers: Authorization: Bearer <bank_token>, X-Requesting-Bank: <requesting_bank>
+        - Body: {client_id, initiation: {amount, creditor, purpose, ...}}
+        
+        Args:
+            bank_token: Bank access token
+            client_id: Client identifier (e.g., "team286-1")
+            amount: Payment amount in rubles
+            recipient_account: Recipient account number
+            recipient_name: Recipient name
+            recipient_inn: Recipient INN
+            recipient_kpp: Recipient KPP
+            recipient_bik: Recipient bank BIK
+            payment_purpose: Payment purpose (назначение платежа)
+            requesting_bank: Requesting bank name (default: "team286")
+        
+        Returns:
+            Dict with payment consent details: {consent_id, status, ...}
+        
+        Raises:
+            HTTPException: On API errors
+        """
+        endpoint = "/domestic-payment-consents"
+        url = f"{self.base_url}{endpoint}"
+        
+        headers = {
+            "Authorization": f"Bearer {bank_token}",
+            "X-Requesting-Bank": requesting_bank,
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "client_id": client_id,
+            "initiation": {
+                "instructed_amount": {
+                    "amount": str(amount),
+                    "currency": "RUB"
+                },
+                "creditor_account": {
+                    "identification": recipient_account,
+                    "name": recipient_name
+                },
+                "creditor": {
+                    "name": recipient_name,
+                    "inn": recipient_inn,
+                    "kpp": recipient_kpp,
+                    "bank_bik": recipient_bik
+                },
+                "remittance_information": {
+                    "unstructured": payment_purpose
+                }
+            }
+        }
+        
+        logger.info(f"Creating payment consent for {self.bank_name}, client_id={client_id}, amount={amount}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                
+                if response.status_code == 401:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Токен авторизации истёк или неверный"
+                    )
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                logger.info(f"Payment consent created: {data}")
+                return data
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Bank API error creating payment consent: {e.response.status_code} - {e.response.text}")
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"Ошибка банка при создании согласия на платёж: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error creating payment consent: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Ошибка соединения с банком"
+            )
+    
+    async def submit_payment(
+        self,
+        bank_token: str,
+        consent_id: str,
+        account_id: str,
+        requesting_bank: str = "team286"
+    ) -> Dict:
+        """
+        Submit payment for execution using payment consent.
+        
+        Flow per OpenBanking documentation:
+        - POST /domestic-payments
+        - Headers: Authorization: Bearer <bank_token>, X-Requesting-Bank: <requesting_bank>
+        - Body: {consent_id, account_id}
+        
+        Args:
+            bank_token: Bank access token
+            consent_id: Payment consent ID
+            account_id: Source account ID for payment
+            requesting_bank: Requesting bank name (default: "team286")
+        
+        Returns:
+            Dict with payment submission details: {payment_id, status, ...}
+        
+        Raises:
+            HTTPException: On API errors
+        """
+        endpoint = "/domestic-payments"
+        url = f"{self.base_url}{endpoint}"
+        
+        headers = {
+            "Authorization": f"Bearer {bank_token}",
+            "X-Requesting-Bank": requesting_bank,
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "consent_id": consent_id,
+            "initiation": {
+                "debtor_account": {
+                    "identification": account_id
+                }
+            }
+        }
+        
+        logger.info(f"Submitting payment for {self.bank_name}, consent_id={consent_id}, account_id={account_id}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                
+                if response.status_code == 401:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Токен авторизации истёк или неверный"
+                    )
+                
+                if response.status_code == 403:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Согласие на платёж не действительно или истекло"
+                    )
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                logger.info(f"Payment submitted: {data}")
+                return data
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Bank API error submitting payment: {e.response.status_code} - {e.response.text}")
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"Ошибка банка при исполнении платежа: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error submitting payment: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Ошибка соединения с банком"
+            )
+    
+    async def get_payment_status(self, bank_token: str, payment_id: str) -> Dict:
+        """
+        Check payment status.
+        
+        Flow per OpenBanking documentation:
+        - GET /domestic-payments/{payment_id}
+        - Headers: Authorization: Bearer <bank_token>
+        
+        Args:
+            bank_token: Bank access token
+            payment_id: Payment identifier
+        
+        Returns:
+            Dict with payment status: {payment_id, status, ...}
+        
+        Raises:
+            HTTPException: On API errors
+        """
+        endpoint = f"/domestic-payments/{payment_id}"
+        url = f"{self.base_url}{endpoint}"
+        
+        headers = {
+            "Authorization": f"Bearer {bank_token}"
+        }
+        
+        logger.info(f"Checking payment status for {payment_id} at {self.bank_name}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(url, headers=headers)
+                
+                if response.status_code == 404:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Платёж не найден"
+                    )
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                logger.info(f"Payment status: {data}")
+                return data
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Bank API error checking payment: {e.response.status_code} - {e.response.text}")
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"Ошибка банка: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error checking payment: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Ошибка соединения с банком"
+            )
