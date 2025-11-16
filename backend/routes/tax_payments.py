@@ -205,12 +205,12 @@ async def pay_tax(
     session: Session = Depends(get_session)
 ):
     """
-    Initiate payment for specific tax.
+    Initiate payment for specific tax following Open Banking API flow (Steps 6-7).
     
     Flow:
     1. Get tax payment from DB
-    2. Create payment consent via OpenBanking API
-    3. Submit payment via OpenBanking API
+    2. Create payment consent via OpenBanking API (Step 6)
+    3. Submit payment via OpenBanking API (Step 7)
     4. Update tax payment status
     
     Args:
@@ -239,22 +239,19 @@ async def pay_tax(
         # Initialize bank service
         bank_service = BankService(request.bank_name, session)
         
-        # Step 1: Create payment consent
-        logger.info(f"Creating payment consent for tax {payment_id}")
+        # Step 6: Create payment consent
+        logger.info(f"Step 6: Creating payment consent for tax {payment_id}")
         
         consent_response = await bank_service.create_payment_consent(
             bank_token=request.bank_token,
             client_id=tax_payment.user_id or "team286-1",
             amount=float(tax_payment.tax_amount),
-            recipient_account=tax_payment.tax_recipient_account,
-            recipient_name=tax_payment.tax_recipient,
-            recipient_inn=tax_payment.tax_recipient_inn,
-            recipient_kpp=tax_payment.tax_recipient_kpp,
-            recipient_bik=tax_payment.tax_recipient_bik,
+            debtor_account=request.account_id,
+            recipient_account="4081781028601060774",  # Fixed ФНС account
             payment_purpose=tax_payment.payment_purpose
         )
         
-        consent_id = consent_response.get("consent_id") or consent_response.get("id")
+        consent_id = consent_response.get("consent_id")
         
         if not consent_id:
             raise HTTPException(
@@ -272,23 +269,27 @@ async def pay_tax(
         tax_payment.updated_at = datetime.utcnow()
         session.commit()
         
-        # Step 2: Submit payment
-        logger.info(f"Submitting payment for tax {payment_id}")
+        # Step 7: Submit payment
+        logger.info(f"Step 7: Submitting payment for tax {payment_id}")
         
         payment_response = await bank_service.submit_payment(
             bank_token=request.bank_token,
             consent_id=consent_id,
-            account_id=request.account_id
+            client_id=tax_payment.user_id or "team286-1",
+            amount=float(tax_payment.tax_amount),
+            debtor_account=request.account_id,
+            recipient_account="4081781028601060774",  # Fixed ФНС account
+            payment_comment="Оплата налога"
         )
         
-        payment_id_str = payment_response.get("payment_id") or payment_response.get("id")
+        payment_id_str = payment_response.get("payment_id")
         payment_status = payment_response.get("status", "pending")
         
         # Update tax payment with submission info
         tax_payment.payment_id = payment_id_str
         
-        # Update status based on payment response
-        if payment_status in ["accepted", "completed", "success"]:
+        # Update status based on payment response (Step 7 result)
+        if payment_status in ["AcceptedSettlementCompleted", "accepted", "completed", "success"]:
             tax_payment.status = "paid"
             tax_payment.payment_date = datetime.utcnow()
         elif payment_status in ["rejected", "failed"]:

@@ -317,7 +317,7 @@ async def make_authenticated_request(
         access_token: Bearer token for authentication
         params: Query parameters
         json_data: JSON body data
-        bank_id: Bank identifier for X-Requesting-Bank header (e.g., "team286")
+        bank_id: Bank identifier (abank|sbank|vbank) - determines base URL
         requesting_bank: Requesting bank name (e.g., "team286") for header
         consent_id: Consent ID for X-Consent-Id header (if consent-based request)
 
@@ -330,7 +330,7 @@ async def make_authenticated_request(
     Headers added per OpenBanking API spec:
     - Authorization: Bearer {access_token}
     - X-Requesting-Bank: {requesting_bank} (if provided)
-    - X-Consent-Id: {consent_id} (if provided for account/transaction requests)
+    - consent_id: {consent_id} (if provided for account/transaction requests)
     """
     if not access_token:
         raise HTTPException(
@@ -339,8 +339,20 @@ async def make_authenticated_request(
         )
 
     try:
+        # Determine base URL based on bank_id
+        BANK_URLS = {
+            "abank": "https://abank.open.bankingapi.ru",
+            "sbank": "https://sbank.open.bankingapi.ru",
+            "vbank": "https://vbank.open.bankingapi.ru"
+        }
+        
+        if bank_id and bank_id.lower() in BANK_URLS:
+            base_url = BANK_URLS[bank_id.lower()]
+        else:
+            base_url = BASE_URL  # Default from env
+        
         async with httpx.AsyncClient(timeout=10) as client:
-            url = f"{BASE_URL}{endpoint}"
+            url = f"{base_url}{endpoint}"
             
             # Build headers per OpenBanking API specification
             headers = {"Authorization": f"Bearer {access_token}"}
@@ -350,12 +362,16 @@ async def make_authenticated_request(
                 headers["X-Requesting-Bank"] = requesting_bank
                 logger.debug(f"Added X-Requesting-Bank: {requesting_bank}")
             
-            # Add X-Consent-Id header if provided (required for account/transaction requests)
+            # Add consent_id header if provided (required for account/transaction requests per Open Banking API)
             if consent_id:
-                headers["X-Consent-Id"] = consent_id
-                logger.debug(f"Added X-Consent-Id: {consent_id}")
+                headers["consent_id"] = consent_id
+                logger.debug(f"Added consent_id: {consent_id}")
             
-            logger.info(f"🔍 REQUEST DEBUG: {method} {endpoint}")
+            # Add client_id to params if present in json_data (for account-access-consents endpoint)
+            if params is None:
+                params = {}
+            
+            logger.info(f"🔍 REQUEST DEBUG: {method} {url}")
             logger.info(f"🔍 REQUEST DEBUG: Headers: {', '.join(headers.keys())}")
 
             response = await client.request(

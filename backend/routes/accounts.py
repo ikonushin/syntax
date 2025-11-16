@@ -31,23 +31,23 @@ _tx_cache: Dict[str, Dict] = {}
 @router.get("/accounts")
 async def list_accounts(
     access_token: str = Header(..., alias="Authorization"),
-    consent_id: str = Header(..., alias="X-Consent-Id"),
+    consent_id: str = Header(..., alias="consent_id"),
     bank_name: str = Header(..., alias="X-Bank-Name"),
-    client_id: Optional[str] = Query(None, description="Optional client ID filter"),
+    client_id: str = Header(..., alias="client_id"),
     session: Session = Depends(get_session)
 ):
     """
-    List all accounts available for the authenticated client.
+    List all accounts available for the authenticated client per Open Banking API (Step 3).
     
-    Per OpenBanking API documentation:
+    Per Open Banking API documentation:
     - GET /accounts?client_id={client_id}
-    - Headers: Authorization: Bearer <bank_token>, X-Consent-Id: <consent_id>
+    - Headers: Authorization: Bearer <bank_token>, consent_id: <consent_id>, client_id: <client_id>
     
     Args:
         access_token: JWT session token in Authorization header (Bearer <token>)
-        consent_id: Consent ID for account access (X-Consent-Id header)
+        consent_id: Consent ID for account access (consent_id header)
         bank_name: Bank identifier (X-Bank-Name header): abank|sbank|vbank
-        client_id: Optional client ID filter
+        client_id: Client identifier (client_id header, e.g., "team286-9")
         session: Database session
     
     Returns:
@@ -82,14 +82,14 @@ async def list_accounts(
         # Initialize bank service
         bank_service = BankService(bank_name, session)
         
-        # Get accounts from bank API
+        # Get accounts from bank API (Step 3)
         accounts = await bank_service.get_accounts(
             bank_token=bank_token,
             consent_id=consent_id,
             client_id=client_id
         )
         
-        logger.info(f"Successfully fetched {len(accounts)} accounts from {bank_name}")
+        logger.info(f"Successfully fetched {len(accounts)} accounts from {bank_name} for client {client_id}")
         
         return {"accounts": accounts}
             
@@ -134,14 +134,12 @@ def _filter_transactions(transactions: List[dict],
     
     return filtered
 
-@router.get("/accounts/{account_id}/transactions")
+@router.get("/transactions")
 async def list_transactions(
-    account_id: str,
     access_token: str = Header(..., alias="Authorization"),
-    consent_id: str = Header(..., alias="X-Consent-Id"),
+    consent_id: str = Header(..., alias="consent_id"),
     bank_name: str = Header(..., alias="X-Bank-Name"),
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(50, ge=1, le=500, description="Transactions per page (max 500)"),
+    client_id: str = Header(..., alias="client_id"),
     date_from: Optional[str] = Query(None, description="Start date (ISO format)"),
     date_to: Optional[str] = Query(None, description="End date (ISO format)"),
     min_amount: Optional[float] = Query(None, description="Minimum transaction amount"),
@@ -149,19 +147,17 @@ async def list_transactions(
     session: Session = Depends(get_session)
 ):
     """
-    List transactions for a specific account with pagination and filtering.
+    List transactions for authenticated client per Open Banking API (Step 4).
     
-    Per OpenBanking API documentation:
-    - GET /accounts/{account_id}/transactions?page={page}&limit={limit}
-    - Headers: Authorization: Bearer <bank_token>, X-Consent-Id: <consent_id>
+    Per Open Banking API documentation:
+    - GET /transactions?client_id={client_id}
+    - Headers: Authorization: Bearer <bank_token>, consent_id: <consent_id>, client_id: <client_id>
     
     Args:
-        account_id: Account identifier
         access_token: JWT session token in Authorization header (Bearer <token>)
-        consent_id: Consent ID for transaction access (X-Consent-Id header)
+        consent_id: Consent ID for transaction access (consent_id header)
         bank_name: Bank identifier (X-Bank-Name header): abank|sbank|vbank
-        page: Page number for pagination (default: 1)
-        limit: Transactions per page, max 500 (default: 50)
+        client_id: Client identifier (client_id header, e.g., "team286-9")
         date_from: Filter transactions from this date (ISO format)
         date_to: Filter transactions until this date (ISO format)
         min_amount: Minimum transaction amount
@@ -169,7 +165,7 @@ async def list_transactions(
         session: Database session
     
     Returns:
-        Dict with transactions list and pagination info
+        Dict with transactions list
     """
     try:
         # Extract Bearer token
@@ -195,7 +191,7 @@ async def list_transactions(
             )
         
         # Check cache first
-        cache_key = f"{bank_name}:{account_id}:{page}:{limit}"
+        cache_key = f"{bank_name}:{client_id}"
         current_time = time.time()
         cache_entry = _tx_cache.get(cache_key)
         
@@ -213,19 +209,17 @@ async def list_transactions(
                         date_to=date_to
                     ),
                     "from_cache": True,
-                    "cache_age_seconds": int(cache_age),
-                    "pagination": cache_entry["data"].get("pagination", {})
+                    "cache_age_seconds": int(cache_age)
                 }
         
-        # Fetch fresh data from bank API
+        # Fetch fresh data from bank API (Step 4)
         bank_service = BankService(bank_name, session)
         
         data = await bank_service.get_transactions(
             bank_token=bank_token,
             consent_id=consent_id,
-            account_id=account_id,
-            page=page,
-            limit=limit
+            account_id=None,  # Not used in new API
+            client_id=client_id
         )
         
         # Update cache
@@ -236,7 +230,7 @@ async def list_transactions(
         
         transactions = data.get("transactions", [])
         
-        logger.info(f"Fetched {len(transactions)} transactions for account {account_id} from {bank_name}")
+        logger.info(f"Fetched {len(transactions)} transactions for client {client_id} from {bank_name}")
         
         return {
             "transactions": _filter_transactions(
@@ -246,8 +240,7 @@ async def list_transactions(
                 date_from=date_from,
                 date_to=date_to
             ),
-            "from_cache": False,
-            "pagination": data.get("pagination", {})
+            "from_cache": False
         }
             
     except HTTPException:

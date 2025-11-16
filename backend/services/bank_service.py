@@ -60,57 +60,63 @@ class BankService:
         requesting_bank: str = "team286"
     ) -> Dict:
         """
-        Create consent for account access.
+        Create consent for account access per Open Banking API specification.
         
-        Flow per documentation:
-        - POST /account-consents/request
-        - Headers: Authorization: Bearer <bank_token>, X-Requesting-Bank: <requesting_bank>
-        - Body: {client_id, permissions, reason, requesting_bank, requesting_bank_name}
-        - SBank: returns request_id for manual approval
-        - ABank/VBank: auto-approved, returns consent_id
+        Flow per Open Banking API documentation:
+        - POST /account-access-consents?client_id={client_id}
+        - Headers: Authorization: Bearer <bank_token>, client_id: <client_id>
+        - Body: {"data": {"permissions": [...]}}
+        - SBank: requires manual approval → redirect to https://sbank.open.bankingapi.ru/client/consents.html
+        - ABank/VBank: auto-approved
         
         Args:
-            bank_token: Bank access token
-            client_id: Client identifier (e.g., "team286-1")
+            bank_token: Bank access token from /auth/bank-token
+            client_id: Client identifier (e.g., "team286-9")
             requesting_bank: Requesting bank name (default: "team286")
         
         Returns:
             Dict with consent details:
-            - For auto-approval (ABank/VBank): {status: "approved", consent_id: "..."}
-            - For manual approval (SBank): {status: "awaitingAuthorization", request_id: "...", consent_id: "..."}
+            - For auto-approval (ABank/VBank): {status: "approved", consent_id: "...", ...}
+            - For manual approval (SBank): {status: "awaitingAuthorization", consent_id: "...", redirect_url: "..."}
         
         Raises:
             HTTPException: On API errors
         """
-        endpoint = "/account-consents/request"
+        endpoint = f"/account-access-consents"
         url = f"{self.base_url}{endpoint}"
         
-        # Determine if manual approval required
-        auto_approved = self.bank_name in ["abank", "vbank"]
+        # Determine if manual approval required (SBank only)
+        requires_manual_approval = self.bank_name == "sbank"
         
         headers = {
             "Authorization": f"Bearer {bank_token}",
-            "X-Requesting-Bank": requesting_bank
-        }
-        
-        payload = {
             "client_id": client_id,
-            "permissions": [
-                "ReadAccountsDetail",
-                "ReadBalances",
-                "ReadTransactionsDetail"
-            ],
-            "reason": "Агрегация счетов для Hackathon MVP",
-            "requesting_bank": requesting_bank,
-            "requesting_bank_name": "SYNTAX App",
-            "auto_approved": auto_approved
+            "Content-Type": "application/json"
         }
         
-        logger.info(f"Creating consent for {self.bank_name}, client_id={client_id}, auto_approved={auto_approved}")
+        # Query parameters
+        params = {
+            "client_id": client_id
+        }
+        
+        # Body structure per Open Banking API spec
+        payload = {
+            "data": {
+                "permissions": [
+                    "ReadAccountsBasic",
+                    "ReadAccountsDetail",
+                    "ReadBalances",
+                    "ReadTransactionsBasic",
+                    "ReadTransactionsDetail"
+                ]
+            }
+        }
+        
+        logger.info(f"Creating consent for {self.bank_name}, client_id={client_id}, manual_approval={requires_manual_approval}")
         
         try:
             async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(url, headers=headers, json=payload)
+                response = await client.post(url, headers=headers, params=params, json=payload)
                 
                 if response.status_code == 401:
                     raise HTTPException(
@@ -121,29 +127,41 @@ class BankService:
                 response.raise_for_status()
                 data = response.json()
                 
-                logger.info(f"Consent created: {data}")
+                logger.info(f"Consent API response: {data}")
+                
+                # Extract consent_id from response
+                # Per Open Banking API: response contains {"Data": {"ConsentId": "...", "Status": "..."}}
+                consent_data = data.get("Data", data)
+                consent_id = consent_data.get("ConsentId") or consent_data.get("consent_id") or data.get("id")
+                consent_status = consent_data.get("Status", "AwaitingAuthorisation" if requires_manual_approval else "Authorised")
+                
+                # For SBank, generate redirect URL for manual approval
+                redirect_uri = None
+                if requires_manual_approval:
+                    redirect_uri = f"https://sbank.open.bankingapi.ru/client/consents.html"
                 
                 # Save consent to database
-                consent_id = data.get("consent_id") or data.get("id")
-                request_id = data.get("request_id")
-                consent_status = data.get("status", "approved" if auto_approved else "awaitingAuthorization")
-                
                 consent = Consent(
                     bank_name=self.bank_name,
                     client_id=client_id,
-                    consent_id=consent_id or f"pending-{request_id}",
-                    request_id=request_id,
-                    status=consent_status,
-                    redirect_uri=data.get("redirect_uri")
+                    consent_id=consent_id or f"pending-{client_id}",
+                    status=consent_status.lower() if consent_status else "pending",
+                    redirect_uri=redirect_uri
                 )
                 
                 self.db_session.add(consent)
                 self.db_session.commit()
                 self.db_session.refresh(consent)
                 
-                logger.info(f"Saved consent to DB: {consent.id}")
+                logger.info(f"Saved consent to DB: {consent.id}, consent_id={consent_id}, status={consent_status}")
                 
-                return data
+                # Return normalized response
+                return {
+                    "consent_id": consent_id,
+                    "status": consent_status,
+                    "redirect_url": redirect_uri,
+                    "requires_manual_approval": requires_manual_approval
+                }
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"Bank API error creating consent: {e.response.status_code} - {e.response.text}")
@@ -228,16 +246,16 @@ class BankService:
     
     async def get_accounts(self, bank_token: str, consent_id: str, client_id: Optional[str] = None) -> List[Dict]:
         """
-        Get list of accounts for authorized client.
+        Get list of accounts for authorized client per Open Banking API.
         
-        Flow per documentation:
-        - GET /accounts?client_id={client_id} (optional)
-        - Headers: Authorization: Bearer <bank_token>, X-Consent-Id: <consent_id>
+        Flow per Open Banking API documentation:
+        - GET /accounts?client_id={client_id}
+        - Headers: Authorization: Bearer <bank_token>, consent_id: <consent_id>, client_id: <client_id>
         
         Args:
             bank_token: Bank access token
             consent_id: Consent ID for account access
-            client_id: Optional client filter
+            client_id: Client identifier (required)
         
         Returns:
             List of account dictionaries
@@ -250,14 +268,15 @@ class BankService:
         
         headers = {
             "Authorization": f"Bearer {bank_token}",
-            "X-Consent-Id": consent_id
+            "consent_id": consent_id,
+            "client_id": client_id or "team286"
         }
         
         params = {}
         if client_id:
             params["client_id"] = client_id
         
-        logger.info(f"Fetching accounts from {self.bank_name} with consent {consent_id}")
+        logger.info(f"Fetching accounts from {self.bank_name} with consent_id={consent_id}, client_id={client_id}")
         
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -302,20 +321,22 @@ class BankService:
         bank_token: str,
         consent_id: str,
         account_id: str,
+        client_id: Optional[str] = None,
         page: int = 1,
         limit: int = 50
     ) -> Dict:
         """
-        Get transaction history for account.
+        Get transaction history for account per Open Banking API.
         
-        Flow per documentation:
-        - GET /accounts/{account_id}/transactions?page={page}&limit={limit}
-        - Headers: Authorization: Bearer <bank_token>, X-Consent-Id: <consent_id>
+        Flow per Open Banking API documentation:
+        - GET /transactions?client_id={client_id}
+        - Headers: Authorization: Bearer <bank_token>, consent_id: <consent_id>, client_id: <client_id>
         
         Args:
             bank_token: Bank access token
             consent_id: Consent ID for transaction access
-            account_id: Account identifier
+            account_id: Account identifier (used for filtering if needed)
+            client_id: Client identifier
             page: Page number (default: 1)
             limit: Transactions per page (default: 50, max: 500)
         
@@ -325,20 +346,20 @@ class BankService:
         Raises:
             HTTPException: On API errors
         """
-        endpoint = f"/accounts/{account_id}/transactions"
+        endpoint = f"/transactions"
         url = f"{self.base_url}{endpoint}"
         
         headers = {
             "Authorization": f"Bearer {bank_token}",
-            "X-Consent-Id": consent_id
+            "consent_id": consent_id,
+            "client_id": client_id or "team286"
         }
         
         params = {
-            "page": page,
-            "limit": min(limit, 500)  # Cap at 500 per documentation
+            "client_id": client_id or "team286"
         }
         
-        logger.info(f"Fetching transactions for account {account_id} from {self.bank_name} (page={page}, limit={limit})")
+        logger.info(f"Fetching transactions from {self.bank_name} with consent_id={consent_id}, client_id={client_id}")
         
         try:
             async with httpx.AsyncClient(timeout=15) as client:
@@ -492,31 +513,33 @@ class BankService:
         bank_token: str,
         client_id: str,
         amount: float,
-        recipient_account: str,
-        recipient_name: str,
-        recipient_inn: str,
-        recipient_kpp: str,
-        recipient_bik: str,
-        payment_purpose: str,
+        debtor_account: str,
+        recipient_account: str = "4081781028601060774",
+        recipient_name: str = "ФНС России",
+        recipient_inn: str = "7707329152",
+        recipient_kpp: str = "770701001",
+        recipient_bik: str = "044525000",
+        payment_purpose: str = "Оплата налога",
         requesting_bank: str = "team286"
     ) -> Dict:
         """
-        Create payment consent for domestic transfer.
+        Create payment consent per Open Banking API specification (Step 6).
         
-        Flow per OpenBanking documentation:
-        - POST /domestic-payment-consents
-        - Headers: Authorization: Bearer <bank_token>, X-Requesting-Bank: <requesting_bank>
-        - Body: {client_id, initiation: {amount, creditor, purpose, ...}}
+        Flow per Open Banking API documentation:
+        - POST /payment-consents?client_id={client_id}
+        - Headers: Authorization: Bearer <bank_token>, client_id: <client_id>
+        - Body: {"data": {"permissions": ["CreatePayment"], "initiation": {...}}}
         
         Args:
             bank_token: Bank access token
-            client_id: Client identifier (e.g., "team286-1")
-            amount: Payment amount in rubles
-            recipient_account: Recipient account number
-            recipient_name: Recipient name
-            recipient_inn: Recipient INN
-            recipient_kpp: Recipient KPP
-            recipient_bik: Recipient bank BIK
+            client_id: Client identifier (e.g., "team286-9")
+            amount: Payment amount in rubles (random from tax calculation 2000-5000)
+            debtor_account: Source account from step 3 (user's account)
+            recipient_account: Fixed ФНС account (4081781028601060774)
+            recipient_name: Fixed recipient name (ФНС России)
+            recipient_inn: Fixed ФНС INN
+            recipient_kpp: Fixed ФНС KPP
+            recipient_bik: Fixed bank BIK
             payment_purpose: Payment purpose (назначение платежа)
             requesting_bank: Requesting bank name (default: "team286")
         
@@ -526,43 +549,48 @@ class BankService:
         Raises:
             HTTPException: On API errors
         """
-        endpoint = "/domestic-payment-consents"
+        endpoint = "/payment-consents"
         url = f"{self.base_url}{endpoint}"
         
         headers = {
             "Authorization": f"Bearer {bank_token}",
-            "X-Requesting-Bank": requesting_bank,
+            "client_id": client_id,
             "Content-Type": "application/json"
         }
         
+        params = {
+            "client_id": client_id
+        }
+        
+        # Body structure per Open Banking API spec (Step 6)
         payload = {
-            "client_id": client_id,
-            "initiation": {
-                "instructed_amount": {
-                    "amount": str(amount),
-                    "currency": "RUB"
-                },
-                "creditor_account": {
-                    "identification": recipient_account,
-                    "name": recipient_name
-                },
-                "creditor": {
-                    "name": recipient_name,
-                    "inn": recipient_inn,
-                    "kpp": recipient_kpp,
-                    "bank_bik": recipient_bik
-                },
-                "remittance_information": {
-                    "unstructured": payment_purpose
+            "data": {
+                "permissions": [
+                    "CreatePayment"
+                ],
+                "initiation": {
+                    "instructedAmount": {
+                        "amount": f"{amount:.2f}",
+                        "currency": "RUB"
+                    },
+                    "debtorAccount": {
+                        "schemeName": "RU.CBR.PAN",
+                        "identification": debtor_account
+                    },
+                    "creditorAccount": {
+                        "schemeName": "RU.CBR.PAN",
+                        "identification": recipient_account,
+                        "bank_code": self.bank_name
+                    }
                 }
             }
         }
         
-        logger.info(f"Creating payment consent for {self.bank_name}, client_id={client_id}, amount={amount}")
+        logger.info(f"Creating payment consent for {self.bank_name}, client_id={client_id}, amount={amount}, debtor={debtor_account}")
         
         try:
             async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(url, headers=headers, json=payload)
+                response = await client.post(url, headers=headers, params=params, json=payload)
                 
                 if response.status_code == 401:
                     raise HTTPException(
@@ -573,8 +601,18 @@ class BankService:
                 response.raise_for_status()
                 data = response.json()
                 
-                logger.info(f"Payment consent created: {data}")
-                return data
+                logger.info(f"Payment consent API response: {data}")
+                
+                # Extract consent_id from response
+                consent_data = data.get("Data", data)
+                consent_id = consent_data.get("ConsentId") or consent_data.get("consent_id") or data.get("id")
+                
+                return {
+                    "consent_id": consent_id,
+                    "status": consent_data.get("Status", "Authorised"),
+                    "amount": amount,
+                    "currency": "RUB"
+                }
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"Bank API error creating payment consent: {e.response.status_code} - {e.response.text}")
@@ -593,21 +631,29 @@ class BankService:
         self,
         bank_token: str,
         consent_id: str,
-        account_id: str,
+        client_id: str,
+        amount: float,
+        debtor_account: str,
+        recipient_account: str = "4081781028601060774",
+        payment_comment: str = "Оплата налога",
         requesting_bank: str = "team286"
     ) -> Dict:
         """
-        Submit payment for execution using payment consent.
+        Submit payment for execution using payment consent (Step 7).
         
-        Flow per OpenBanking documentation:
-        - POST /domestic-payments
-        - Headers: Authorization: Bearer <bank_token>, X-Requesting-Bank: <requesting_bank>
-        - Body: {consent_id, account_id}
+        Flow per Open Banking API documentation:
+        - POST /payments?client_id={client_id}
+        - Headers: Authorization: Bearer <bank_token>, consent_id: <consent_id>, client_id: <client_id>
+        - Body: {"data": {"initiation": {...}}}
         
         Args:
             bank_token: Bank access token
-            consent_id: Payment consent ID
-            account_id: Source account ID for payment
+            consent_id: Payment consent ID from step 6
+            client_id: Client identifier (e.g., "team286-9")
+            amount: Payment amount (same as in step 6)
+            debtor_account: Source account from step 3
+            recipient_account: Fixed ФНС account (4081781028601060774)
+            payment_comment: Payment comment (default: "Оплата налога")
             requesting_bank: Requesting bank name (default: "team286")
         
         Returns:
@@ -616,29 +662,47 @@ class BankService:
         Raises:
             HTTPException: On API errors
         """
-        endpoint = "/domestic-payments"
+        endpoint = "/payments"
         url = f"{self.base_url}{endpoint}"
         
         headers = {
             "Authorization": f"Bearer {bank_token}",
-            "X-Requesting-Bank": requesting_bank,
+            "consent_id": consent_id,
+            "client_id": client_id,
             "Content-Type": "application/json"
         }
         
+        params = {
+            "client_id": client_id
+        }
+        
+        # Body structure per Open Banking API spec (Step 7)
         payload = {
-            "consent_id": consent_id,
-            "initiation": {
-                "debtor_account": {
-                    "identification": account_id
+            "data": {
+                "initiation": {
+                    "instructedAmount": {
+                        "amount": f"{amount:.2f}",
+                        "currency": "RUB"
+                    },
+                    "debtorAccount": {
+                        "schemeName": "RU.CBR.PAN",
+                        "identification": debtor_account
+                    },
+                    "creditorAccount": {
+                        "schemeName": "RU.CBR.PAN",
+                        "identification": recipient_account,
+                        "bank_code": self.bank_name
+                    },
+                    "comment": payment_comment
                 }
             }
         }
         
-        logger.info(f"Submitting payment for {self.bank_name}, consent_id={consent_id}, account_id={account_id}")
+        logger.info(f"Submitting payment for {self.bank_name}, consent_id={consent_id}, client_id={client_id}, amount={amount}")
         
         try:
             async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(url, headers=headers, json=payload)
+                response = await client.post(url, headers=headers, params=params, json=payload)
                 
                 if response.status_code == 401:
                     raise HTTPException(
@@ -655,8 +719,21 @@ class BankService:
                 response.raise_for_status()
                 data = response.json()
                 
-                logger.info(f"Payment submitted: {data}")
-                return data
+                logger.info(f"Payment API response: {data}")
+                
+                # Extract payment details from response
+                payment_data = data.get("Data", data)
+                payment_id = payment_data.get("PaymentId") or payment_data.get("payment_id") or data.get("id")
+                payment_status = payment_data.get("Status", "AcceptedSettlementCompleted")
+                
+                return {
+                    "payment_id": payment_id,
+                    "status": payment_status,
+                    "amount": amount,
+                    "currency": "RUB",
+                    "creationDateTime": payment_data.get("CreationDateTime", datetime.utcnow().isoformat()),
+                    "statusUpdateDateTime": payment_data.get("StatusUpdateDateTime", datetime.utcnow().isoformat())
+                }
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"Bank API error submitting payment: {e.response.status_code} - {e.response.text}")

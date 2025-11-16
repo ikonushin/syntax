@@ -27,8 +27,8 @@ router = APIRouter(prefix="/api", tags=["auth"])
 
 # Request/Response Models
 class AuthRequest(BaseModel):
-    """Login credentials for team authentication."""
-    client_id: str
+    """Login credentials for team authentication (Step 1)."""
+    client_id: str  # e.g., "team286-9" where -9 is user selection on step 2
     client_secret: str
     user_id: int = 1
 
@@ -69,27 +69,31 @@ class ConsentStatusResponse(BaseModel):
     "/authenticate",
     response_model=AuthenticateResponse,
     status_code=status.HTTP_200_OK,
-    summary="Authenticate a team",
-    description="Authenticate using client_id and client_secret. Returns a JWT session token wrapping the bank access token."
+    summary="Authenticate a team (Step 1)",
+    description="Authenticate using client_id and client_secret. Returns a JWT session token. Client_id format: team286-X where X is user selection (1-9)."
 )
 async def authenticate(request: AuthRequest):
     """
-    Authenticate a team and obtain a JWT session token.
+    Authenticate a team and obtain a JWT session token (Step 1).
 
     **Request body:**
-    - `client_id`: Team client ID (e.g., "team286")
+    - `client_id`: Team client ID (e.g., "team286-9" where -9 is user selection on step 2)
     - `client_secret`: Team API secret key
 
     **Returns:**
     - `access_token`: JWT session token (30 min expiry)
     - `token_type`: "bearer"
     - `expires_in`: Session duration in seconds (1800 = 30 min)
-    - `bank_token_expires_in`: Underlying bank token expiry
+    - `bank_token_expires_in`: Underlying bank token expiry (1 hour)
 
     **Errors:**
     - 400: Missing required fields
     - 401: Invalid credentials
     - 503: External API unavailable
+    
+    **Note:** 
+    - Step 1: User enters login (team286) to get access_token
+    - Step 2: User selects user_id (1-9) which forms client_id for consents (team286-9)
     """
     # 🔍 ЛОГИРУЕМ ЧТО ПРИШЛО
     logger.info(f"🔍 BACKEND DEBUG: POST /api/authenticate received")
@@ -141,37 +145,42 @@ async def authenticate(request: AuthRequest):
     "/consents",
     response_model=ConsentResponse,
     status_code=status.HTTP_200_OK,
-    summary="Create a consent (OpenBanking Sequence Diagram compliant)",
-    description="Create a consent for a team user and bank. Implements dual flow: auto-approval (VBank/ABank) vs manual approval (SBank)."
+    summary="Create a consent (Step 2)",
+    description="Create consent for account access per Open Banking API. User selects bank (vbank/abank/sbank) which determines URL. For SBank, user must manually approve via redirect."
 )
 async def create_consent(request: ConsentRequest):
     """
-    Create a consent for a team user and bank following OpenBanking API Sequence Diagrams.
+    Create a consent for account access following Open Banking API (Step 2).
     
     Two different workflows depending on bank:
 
     **For VBank/ABank (Auto-Approval):**
-    - POST /account-consents/request with auto_approved=true
+    - POST /account-access-consents?client_id={user_id}
+    - Headers: Authorization: Bearer <token>, client_id: <user_id>
     - Returns: {status: "success", consent_id, ...}
-    - Consent immediately active in bank dashboard
-    - Frontend can proceed to /transactions
+    - Consent immediately active
+    - Frontend can proceed to /accounts (Step 3)
 
     **For SBank (Manual Approval):**
-    - POST /account-consents/request with auto_approved=false
-    - Returns: {status: "pending", request_id, redirect_url, ...}
-    - Frontend opens redirect_url in new tab for user to sign
-    - Frontend polls GET /api/consents/{consent_id}/status until authorized
-    - Once authorized, backend detects and frontend proceeds to /transactions
+    - POST /account-access-consents?client_id={user_id}
+    - Returns: {status: "pending", consent_id, redirect_url, ...}
+    - Frontend redirects user to https://sbank.open.bankingapi.ru/client/consents.html
+    - User manually confirms consent in browser
+    - After confirmation, proceed to /accounts (Step 3)
 
     **Request body:**
-    - `access_token`: JWT token from previous authentication
-    - `user_id`: User ID (e.g., "team-286-4")
-    - `bank_id`: Bank ID ("vbank", "abank", or "sbank")
+    - `access_token`: JWT token from step 1 authentication
+    - `user_id`: User ID (e.g., "team286-9" - formed from login + user selection)
+    - `bank_id`: Bank ID ("vbank", "abank", or "sbank") - determines URL
 
     **Errors:**
     - 400: Missing required fields or invalid bank
     - 401: Invalid or expired token
     - 503: Bank API unavailable
+    
+    **Note:**
+    - User can change client_id here (e.g., from team286 to team286-9)
+    - Bank selection determines the API URL (https://{bank}.open.bankingapi.ru)
     """
     if not request.access_token or not request.user_id or not request.bank_id:
         raise HTTPException(
@@ -466,27 +475,31 @@ class RevokeConsentRequest(BaseModel):
 @router.delete(
     "/consents/{consent_id}",
     status_code=status.HTTP_200_OK,
-    summary="Revoke consent (disconnect bank)",
-    description="Revoke bank consent when user disconnects a bank. Calls DELETE /account-consents/{consent_id} on bank API."
+    summary="Revoke consent (Step 5 - disconnect bank)",
+    description="Revoke bank consent per Open Banking API. Calls DELETE /account-access-consents/{consent_id}?client_id={client_id}"
 )
 async def revoke_consent(
     consent_id: str,
     bank_id: str,
+    client_id: str,
     access_token: str,
     session: Session = Depends(get_session)
 ):
     """
-    Revoke a consent to disconnect a bank.
+    Revoke a consent to disconnect a bank (Step 5).
     
-    This endpoint is called when user clicks "Disconnect" button in bank management UI.
-    It calls DELETE /account-consents/{consent_id} on the bank API and updates
-    consent status in database.
+    Per Open Banking API documentation:
+    - DELETE /account-access-consents/{consent_id}?client_id={client_id}
+    - Headers: Authorization: Bearer <bank_token>, client_id: <client_id>
+    
+    This endpoint is called when user clicks "Disconnect" button in settings.
     
     **Path parameters:**
     - `consent_id`: Consent ID to revoke
     
     **Query parameters:**
-    - `bank_id`: Bank name (abank|sbank|vbank)
+    - `bank_id`: Bank name (abank|sbank|vbank) - determines URL
+    - `client_id`: Client identifier (e.g., "team286-9")
     - `access_token`: JWT session token
     
     **Returns:**
