@@ -63,15 +63,37 @@ async def list_accounts(
         else:
             jwt_token = access_token
         
-        # Decode JWT to get bank token
+        # Decode JWT to get credentials for bank-specific auth
         try:
             token_data = decode_token(jwt_token)
-            bank_token = token_data.get("bank_token")
-            if not bank_token:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Invalid token: no bank token found"
+            client_id_stored = token_data.get("client_id")
+            client_secret = token_data.get("client_secret")
+            
+            if not client_secret:
+                logger.warning(f"🔍 ACCOUNTS DEBUG: No client_secret in JWT, trying fallback token")
+                # Fallback to universal token if available
+                fallback_token = token_data.get("access_token")
+                if not fallback_token:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Invalid token: missing credentials"
+                    )
+                bank_token = fallback_token
+                logger.info(f"🔍 ACCOUNTS DEBUG: Using fallback universal token")
+            else:
+                # Get bank-specific token
+                from services.auth_service import authenticate_with_bank
+                logger.info(f"🔍 ACCOUNTS DEBUG: Getting bank-specific token for {bank_name}")
+                bank_token_data = await authenticate_with_bank(
+                    client_id=client_id_stored,
+                    client_secret=client_secret,
+                    bank_id=bank_name
                 )
+                bank_token = bank_token_data.get("access_token")
+                logger.info(f"🔍 ACCOUNTS DEBUG: Got bank-specific token for {bank_name}")
+                
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Token decode error: {str(e)}")
             raise HTTPException(
@@ -86,7 +108,8 @@ async def list_accounts(
         accounts = await bank_service.get_accounts(
             bank_token=bank_token,
             consent_id=consent_id,
-            client_id=client_id
+            client_id=client_id,
+            requesting_bank="team286"
         )
         
         logger.info(f"Successfully fetched {len(accounts)} accounts from {bank_name} for client {client_id}")
@@ -140,8 +163,14 @@ async def list_transactions(
     consent_id: str = Header(..., alias="consent_id"),
     bank_name: str = Header(..., alias="X-Bank-Name"),
     client_id: str = Header(..., alias="client_id"),
-    date_from: Optional[str] = Query(None, description="Start date (ISO format)"),
-    date_to: Optional[str] = Query(None, description="End date (ISO format)"),
+    account_id: Optional[str] = Header(None, alias="accountId"),
+    from_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD format)"),
+    to_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD format)"),
+    from_booking_date_time: Optional[str] = Query(None, description="From booking date time (ISO format)"),
+    to_booking_date_time: Optional[str] = Query(None, description="To booking date time (ISO format)"),
+    page: int = Query(1, description="Page number"),
+    limit: int = Query(50, description="Results per page (max 500)"),
+    offset: int = Query(0, description="Offset for pagination"),
     min_amount: Optional[float] = Query(None, description="Minimum transaction amount"),
     max_amount: Optional[float] = Query(None, description="Maximum transaction amount"),
     session: Session = Depends(get_session)
@@ -167,6 +196,8 @@ async def list_transactions(
     Returns:
         Dict with transactions list
     """
+    logger.info(f"📱 TX REQUEST: bank_name={bank_name}, account_id={account_id}, from_date={from_date}, to_date={to_date}, limit={limit}")
+    
     try:
         # Extract Bearer token
         if access_token.startswith("Bearer "):
@@ -174,15 +205,37 @@ async def list_transactions(
         else:
             jwt_token = access_token
         
-        # Decode JWT to get bank token
+        # Decode JWT to get credentials for bank-specific auth
         try:
             token_data = decode_token(jwt_token)
-            bank_token = token_data.get("bank_token")
-            if not bank_token:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Invalid token: no bank token found"
+            client_id_stored = token_data.get("client_id")
+            client_secret = token_data.get("client_secret")
+            
+            if not client_secret:
+                logger.warning(f"🔍 TRANSACTIONS DEBUG: No client_secret in JWT, trying fallback token")
+                # Fallback to universal token if available
+                fallback_token = token_data.get("access_token")
+                if not fallback_token:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Invalid token: missing credentials"
+                    )
+                bank_token = fallback_token
+                logger.info(f"🔍 TRANSACTIONS DEBUG: Using fallback universal token")
+            else:
+                # Get bank-specific token
+                from services.auth_service import authenticate_with_bank
+                logger.info(f"🔍 TRANSACTIONS DEBUG: Getting bank-specific token for {bank_name}")
+                bank_token_data = await authenticate_with_bank(
+                    client_id=client_id_stored,
+                    client_secret=client_secret,
+                    bank_id=bank_name
                 )
+                bank_token = bank_token_data.get("access_token")
+                logger.info(f"🔍 TRANSACTIONS DEBUG: Got bank-specific token for {bank_name}")
+                
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Token decode error: {str(e)}")
             raise HTTPException(
@@ -205,8 +258,8 @@ async def list_transactions(
                         transactions,
                         min_amount=min_amount,
                         max_amount=max_amount,
-                        date_from=date_from,
-                        date_to=date_to
+                        date_from=from_date,
+                        date_to=to_date
                     ),
                     "from_cache": True,
                     "cache_age_seconds": int(cache_age)
@@ -215,12 +268,24 @@ async def list_transactions(
         # Fetch fresh data from bank API (Step 4)
         bank_service = BankService(bank_name, session)
         
+        logger.info(f"📱 FETCHING: Calling BankService.get_transactions for {bank_name}, account_id={account_id}")
+        
         data = await bank_service.get_transactions(
             bank_token=bank_token,
             consent_id=consent_id,
-            account_id=None,  # Not used in new API
-            client_id=client_id
+            account_id=account_id,  # Use accountId from header
+            client_id=client_id,
+            requesting_bank="team286",
+            page=page,
+            limit=limit,
+            from_date=from_date,
+            to_date=to_date,
+            from_booking_date_time=from_booking_date_time,
+            to_booking_date_time=to_booking_date_time,
+            offset=offset
         )
+        
+        logger.info(f"📱 RESPONSE: Got data from BankService: {len(data.get('transactions', []))} transactions")
         
         # Update cache
         _tx_cache[cache_key] = {
@@ -237,8 +302,8 @@ async def list_transactions(
                 transactions,
                 min_amount=min_amount,
                 max_amount=max_amount,
-                date_from=date_from,
-                date_to=date_to
+                date_from=from_date,
+                date_to=to_date
             ),
             "from_cache": False
         }

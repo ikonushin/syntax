@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import os
 
 from database import engine, get_session
-from routes import receipts, auth, tax_payments
+from routes import receipts, auth, tax_payments, accounts
 from models.receipt import Receipt
 from models.consent import Consent
 from models.tax_payment import TaxPayment
@@ -69,6 +69,7 @@ async def root():
 app.include_router(auth.router)
 app.include_router(receipts.router)
 app.include_router(tax_payments.router)
+app.include_router(accounts.router)
 
 # Health check endpoints
 @app.get("/health")
