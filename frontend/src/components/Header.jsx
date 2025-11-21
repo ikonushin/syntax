@@ -19,7 +19,13 @@ export function Header() {
       // Stay on dashboard or navigate to a default page
       return
     }
-    navigate('/dashboard')
+    // Always navigate back to dashboard, which has error handling
+    try {
+      navigate('/dashboard')
+    } catch (err) {
+      console.error('Navigation error:', err)
+      window.location.href = '/dashboard'
+    }
   }
 
   return (

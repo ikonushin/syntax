@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { PrivateRoute } from './components/PrivateRoute'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthPage } from './pages/AuthPage'
 import { BanksPage } from './pages/BanksPage'
 import { TransactionsPage } from './pages/TransactionsPage'
@@ -59,18 +60,22 @@ function AppRoutes() {
       <Route
         path="/tax-payments"
         element={
-          <PrivateRoute>
-            <TaxPaymentsPage />
-          </PrivateRoute>
+          <ErrorBoundary>
+            <PrivateRoute>
+              <TaxPaymentsPage />
+            </PrivateRoute>
+          </ErrorBoundary>
         }
       />
 
       <Route
         path="/settings"
         element={
-          <PrivateRoute>
-            <SettingsPage />
-          </PrivateRoute>
+          <ErrorBoundary>
+            <PrivateRoute>
+              <SettingsPage />
+            </PrivateRoute>
+          </ErrorBoundary>
         }
       />
 

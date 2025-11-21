@@ -53,15 +53,25 @@ function TaxPaymentsPage() {
   const loadTaxPayments = async () => {
     try {
       setLoading(true)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      
       const response = await axios.get(`${API_BASE_URL}/v1/tax-payments`, {
-        params: { user_id: userId }
+        params: { user_id: userId },
+        signal: controller.signal
       })
       
+      clearTimeout(timeoutId)
       setTaxPayments(response.data)
       setError(null)
     } catch (err) {
-      console.error('Error loading tax payments:', err)
-      setError('Ошибка загрузки налоговых платежей')
+      if (err.name === 'AbortError') {
+        console.error('Tax payments request timed out')
+        setError('Истек timeout при загрузке налоговых платежей')
+      } else {
+        console.error('Error loading tax payments:', err)
+        setError('Ошибка загрузки налоговых платежей')
+      }
     } finally {
       setLoading(false)
     }
@@ -82,13 +92,18 @@ function TaxPaymentsPage() {
       let userConsents = []
       try {
         console.log(`TaxPayments: Fetching consents for ${userId}...`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+        
         const consentsResponse = await axios.get(`${API_BASE_URL}/api/user-consents`, {
           params: {
             user_id: userId,
             access_token: accessToken
-          }
+          },
+          signal: controller.signal
         })
         
+        clearTimeout(timeoutId)
         userConsents = consentsResponse.data.consents || []
         console.log(`TaxPayments: Found ${userConsents.length} consents:`, userConsents)
       } catch (err) {
@@ -105,13 +120,24 @@ function TaxPaymentsPage() {
       
       // Load accounts from each consent
       let allAccounts = []
+      const loadStartTime = Date.now()
+      const maxLoadTime = 5000 // 5 seconds total timeout
       
       for (const consent of userConsents) {
+        // Check if we've exceeded max load time
+        if (Date.now() - loadStartTime > maxLoadTime) {
+          console.warn(`TaxPayments: Exceeded max load time, stopping account loads`)
+          break
+        }
+        
         try {
           const bankId = consent.bank_id || consent.bank_name
           const consentId = consent.consent_id
           
           console.log(`TaxPayments: Fetching accounts from ${bankId} (consent: ${consentId})...`)
+          
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout per request
           
           const response = await axios.get(`${API_BASE_URL}/v1/accounts`, {
             headers: {
@@ -119,18 +145,33 @@ function TaxPaymentsPage() {
               'consent_id': consentId,
               'X-Bank-Name': bankId,
               'client_id': userId
-            }
+            },
+            signal: controller.signal
           })
           
+          clearTimeout(timeoutId)
           let accounts = response.data.accounts || response.data || []
           console.log(`TaxPayments: Found ${accounts.length} accounts in ${bankId}`)
           
-          // Load balance for each account
+          // Load balance for each account (with timeout)
           for (let account of accounts) {
+            // Skip balance loading if we're running out of time
+            if (Date.now() - loadStartTime > maxLoadTime - 500) {
+              console.warn(`TaxPayments: Skipping balance for ${account.accountId} - time running out`)
+              account.balance = { amount: 0, currency: 'RUB' }
+              account.bank_name = bankId
+              account.consent_id = consentId
+              allAccounts.push(account)
+              continue
+            }
+            
             try {
               const accountId = account.accountId || account.account_id || account.id
               
               console.log(`TaxPayments: Fetching balance for account ${accountId}...`)
+              
+              const balanceController = new AbortController()
+              const balanceTimeoutId = setTimeout(() => balanceController.abort(), 1500) // 1.5 second timeout
               
               const balanceResponse = await axios.get(
                 `${API_BASE_URL}/v1/accounts/${accountId}/balances`,
@@ -140,9 +181,12 @@ function TaxPaymentsPage() {
                     'consent_id': consentId,
                     'X-Bank-Name': bankId,
                     'client_id': userId
-                  }
+                  },
+                  signal: balanceController.signal
                 }
               )
+              
+              clearTimeout(balanceTimeoutId)
               
               // Add balance to account
               // Backend returns: {data: {balance: [...]}} or {balance: {...}, balances: [...]}
@@ -188,20 +232,26 @@ function TaxPaymentsPage() {
               // Add bank_name and consent_id to account for payment flow
               account.bank_name = bankId
               account.consent_id = consentId
-          console.log(`📝 TaxPayments: Account ready for payment:`, {
+              console.log(`📝 TaxPayments: Account ready for payment:`, {
                 accountId: account.accountId || account.account_id,
                 bank_name: account.bank_name,
                 consent_id: account.consent_id,
                 balance: account.balance
               })
             } catch (balanceErr) {
-              console.error(`TaxPayments: Failed to load balance for account ${accountId}:`, {
-                message: balanceErr.message,
-                response: balanceErr.response?.data,
-                status: balanceErr.response?.status
-              })
+              if (balanceErr.name === 'AbortError') {
+                console.warn(`TaxPayments: Balance request timed out for account ${accountId}`)
+              } else {
+                console.error(`TaxPayments: Failed to load balance for account ${accountId}:`, {
+                  message: balanceErr.message,
+                  response: balanceErr.response?.data,
+                  status: balanceErr.response?.status
+                })
+              }
               // Set default balance if failed
               account.balance = { amount: 0, currency: 'RUB' }
+              account.bank_name = bankId
+              account.consent_id = consentId
             }
           }
           
