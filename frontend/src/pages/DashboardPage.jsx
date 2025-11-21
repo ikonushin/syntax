@@ -256,7 +256,7 @@ export function DashboardPage() {
     })
   }
 
-  const revenueData = getRevenueByDate()
+  const revenueData = getRevenueData()
   const serviceData = getServiceCategories()
   const accountData = getAccountCategories()
   const topClients = getTopClients()
