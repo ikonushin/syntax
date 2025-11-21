@@ -33,27 +33,33 @@ function AppRoutes() {
       <Route
         path="/transactions"
         element={
-          <PrivateRoute>
-            <TransactionsPage />
-          </PrivateRoute>
+          <ErrorBoundary>
+            <PrivateRoute>
+              <TransactionsPage />
+            </PrivateRoute>
+          </ErrorBoundary>
         }
       />
 
       <Route
         path="/receipts"
         element={
-          <PrivateRoute>
-            <ReceiptsPage />
-          </PrivateRoute>
+          <ErrorBoundary>
+            <PrivateRoute>
+              <ReceiptsPage />
+            </PrivateRoute>
+          </ErrorBoundary>
         }
       />
 
       <Route
         path="/dashboard"
         element={
-          <PrivateRoute>
-            <DashboardPage />
-          </PrivateRoute>
+          <ErrorBoundary>
+            <PrivateRoute>
+              <DashboardPage />
+            </PrivateRoute>
+          </ErrorBoundary>
         }
       />
 

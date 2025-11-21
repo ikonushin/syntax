@@ -94,16 +94,24 @@ export function DashboardPage() {
   
   const averageReceipt = filteredReceipts.length > 0 ? totalAmount / filteredReceipts.length : 0
 
-  // Prepare chart data - daily revenue
-  const getRevenueByDate = () => {
+  // Prepare revenue trend chart
+  const getRevenueData = () => {
     const map = {}
     filteredReceipts.forEach(receipt => {
-      const date = new Date(receipt.date).toLocaleDateString('ru-RU', {
-        month: '2-digit',
-        day: '2-digit'
-      })
-      const amount = typeof receipt.totalAmount === 'string' ? parseFloat(receipt.totalAmount) : (receipt.totalAmount || receipt.amount || 0)
-      map[date] = (map[date] || 0) + (isNaN(amount) ? 0 : amount)
+      try {
+        // Safely parse date
+        const receiptDate = receipt.date ? new Date(receipt.date) : null
+        if (!receiptDate || isNaN(receiptDate.getTime())) return // Skip invalid dates
+        
+        const date = receiptDate.toLocaleDateString('ru-RU', {
+          month: '2-digit',
+          day: '2-digit'
+        })
+        const amount = typeof receipt.totalAmount === 'string' ? parseFloat(receipt.totalAmount) : (receipt.totalAmount || receipt.amount || 0)
+        map[date] = (map[date] || 0) + (isNaN(amount) ? 0 : amount)
+      } catch (e) {
+        console.warn('Error processing receipt date:', receipt.date)
+      }
     })
 
     return Object.entries(map)
@@ -129,6 +137,11 @@ export function DashboardPage() {
 
   // Bank names mapping
   const getBankName = (accountId) => {
+    // Handle undefined or null
+    if (!accountId || typeof accountId !== 'string') {
+      return 'Другой банк'
+    }
+    
     // Map account IDs to bank names
     const bankMap = {
       '40702810012340000001': 'Сбербанк',
@@ -154,8 +167,8 @@ export function DashboardPage() {
   const getAccountCategories = () => {
     const map = {}
     filteredReceipts.forEach(receipt => {
-      const bankName = getBankName(receipt.account_id)
-      const amount = typeof receipt.amount === 'string' ? parseFloat(receipt.amount) : receipt.amount
+      const bankName = getBankName(receipt.account_id || '')
+      const amount = typeof receipt.totalAmount === 'string' ? parseFloat(receipt.totalAmount) : (receipt.totalAmount || receipt.amount || 0)
       map[bankName] = (map[bankName] || 0) + (isNaN(amount) ? 0 : amount)
     })
 
@@ -168,20 +181,25 @@ export function DashboardPage() {
   const getTopClients = () => {
     const map = {}
     filteredReceipts.forEach(receipt => {
-      const client = receipt.client_name || 'Unknown'
-      const amount = typeof receipt.amount === 'string' ? parseFloat(receipt.amount) : receipt.amount
+      const client = receipt.clientName || receipt.client_name || 'Unknown'
+      const amount = typeof receipt.totalAmount === 'string' ? parseFloat(receipt.totalAmount) : (receipt.totalAmount || receipt.amount || 0)
+      if (!map[client]) map[client] = 0
       map[client] = (map[client] || 0) + (isNaN(amount) ? 0 : amount)
     })
 
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value: Math.round(value), count: filteredReceipts.filter(r => r.client_name === name).length }))
+      .map(([name, value]) => ({ name, value: Math.round(value), count: filteredReceipts.filter(r => (r.clientName || r.client_name) === name).length }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5)
   }
 
   // Get recent receipts
   const recentReceipts = [...filteredReceipts]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .sort((a, b) => {
+      const dateA = a.date ? new Date(a.date) : new Date(0)
+      const dateB = b.date ? new Date(b.date) : new Date(0)
+      return dateB - dateA
+    })
     .slice(0, 3)
 
   // Compare with previous period
@@ -451,18 +469,18 @@ export function DashboardPage() {
                 {recentReceipts.map((receipt, idx) => (
                   <div key={receipt.id || idx} className="receipt-item">
                     <div className="receipt-info">
-                      <div className="receipt-service">{receipt.service}</div>
+                      <div className="receipt-service">{receipt.service || 'N/A'}</div>
                       <div className="receipt-meta">
-                        <span className="receipt-date">📅 {formatDate(receipt.date)}</span>
-                        <span className="receipt-client">👤 {receipt.client_name}</span>
-                        <span className="receipt-account">💳 {receipt.account_id}</span>
+                        <span className="receipt-date">📅 {formatDate(receipt.date || '')}</span>
+                        <span className="receipt-client">👤 {receipt.clientName || receipt.client_name || 'N/A'}</span>
+                        <span className="receipt-account">💳 {receipt.account_id || 'N/A'}</span>
                       </div>
                     </div>
                     <div className="receipt-amount">
-                      {formatCurrency(receipt.amount)}
+                      {formatCurrency(receipt.totalAmount || receipt.amount || 0)}
                     </div>
                     <div className={`receipt-status status-${receipt.status}`}>
-                      {receipt.status === 'sent' ? '✅' : '📝'} {receipt.status}
+                      {receipt.status === 'sent' ? '✅' : '📝'} {receipt.status || 'draft'}
                     </div>
                   </div>
                 ))}
