@@ -73,5 +73,5 @@ SELECT id, 'Иванов Иван' FROM users WHERE username='testuser';
 -- Пример транзакций
 INSERT INTO transactions (id, bank_id, txn_date, amount, currency, description, counterparty, raw)
 VALUES
-('tx_001', 'sandbox-bank-1', NOW(), 1500.00, 'RUB', 'Оплата от Иванов Иван', 'Иванов Иван', '{}'),
-('tx_002', 'sandbox-bank-1', NOW(), 2300.50, 'RUB', 'Оплата от Петров Петр', 'Петров Петр', '{}');
+(gen_random_uuid(), 'sandbox-bank-1', NOW(), 1500.00, 'RUB', 'Оплата от Иванов Иван', 'Иванов Иван', '{}'),
+(gen_random_uuid(), 'sandbox-bank-1', NOW(), 2300.50, 'RUB', 'Оплата от Петров Петр', 'Петров Петр', '{}');

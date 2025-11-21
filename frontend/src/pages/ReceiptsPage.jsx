@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Header } from '../components/Header'
 import '../styles/ReceiptsPage.css'
 
 export function ReceiptsPage() {
@@ -21,14 +22,27 @@ export function ReceiptsPage() {
   // Individual receipt forms (one per transaction)
   const [receiptForms, setReceiptForms] = useState({})
   
-  const [selectedTxIds, setSelectedTxIds] = useState(location.state?.selectedTransactions || [])
+  const [selectedTxIds, setSelectedTxIds] = useState(() => {
+    // Initialize from location.state, or if selectedTxData is available, use those IDs
+    const stateIds = location.state?.selectedTransactions || []
+    if (stateIds.length === 0) {
+      const stateData = location.state?.selectedTransactionsData || []
+      return stateData.map(tx => tx.id)
+    }
+    return stateIds
+  })
+  const [selectedTxData, setSelectedTxData] = useState(location.state?.selectedTransactionsData || [])
   const [expandedReceiptId, setExpandedReceiptId] = useState(null)
   const [filterStatus, setFilterStatus] = useState('all')
   const [toast, setToast] = useState(null)
   
   // Bulk operations state
-  const [selectedReceiptIds, setSelectedReceiptIds] = useState([])
+  const [selectedReceiptIds, setSelectedReceiptIds] = useState(new Set())
   const [bulkActionMode, setBulkActionMode] = useState(false)
+  
+  // State for splitting receipts into multiple services
+  const [splitReceiptMode, setSplitReceiptMode] = useState(null) // receipId being split
+  const [splitServices, setSplitServices] = useState({}) // { receiptId: [{ name, amount }, ...] }
 
   // Load receipts from localStorage on mount
   useEffect(() => {
@@ -37,9 +51,9 @@ export function ReceiptsPage() {
       try {
         const parsed = JSON.parse(storedReceipts)
         setReceipts(parsed)
-        console.log('📦 RECEIPTS: Loaded from localStorage:', parsed)
+        console.log('RECEIPTS: Loaded from localStorage:', parsed)
       } catch (err) {
-        console.error('❌ RECEIPTS: Failed to parse stored receipts:', err)
+        console.error('RECEIPTS: Failed to parse stored receipts:', err)
       }
     }
     
@@ -50,7 +64,7 @@ export function ReceiptsPage() {
         const parsed = JSON.parse(storedPurposes)
         setSavedServices(parsed)
       } catch (err) {
-        console.error('❌ RECEIPTS: Failed to parse saved purposes:', err)
+        console.error('RECEIPTS: Failed to parse saved purposes:', err)
       }
     }
     
@@ -61,7 +75,7 @@ export function ReceiptsPage() {
         const parsed = JSON.parse(storedServices)
         setSavedServices(parsed)
       } catch (err) {
-        console.error('❌ RECEIPTS: Failed to parse saved services:', err)
+        console.error('RECEIPTS: Failed to parse saved services:', err)
       }
     }
   }, [])
@@ -69,7 +83,7 @@ export function ReceiptsPage() {
   // Save receipts to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('syntax_receipts', JSON.stringify(receipts))
-    console.log('💾 RECEIPTS: Saved to localStorage:', receipts)
+    console.log('RECEIPTS: Saved to localStorage:', receipts)
   }, [receipts])
   
   // Auto-create receipts based on rules from Settings
@@ -126,7 +140,7 @@ export function ReceiptsPage() {
               }
               
               newAutoReceipts.push(newReceipt)
-              console.log('🤖 AUTO-RECEIPT: Matched tx', tx.id, 'by rule:', rule.value)
+              console.log('AUTO-RECEIPT: Matched tx', tx.id, 'by rule:', rule.value)
             }
           })
         })
@@ -152,25 +166,41 @@ export function ReceiptsPage() {
   useEffect(() => {
     if (selectedTxIds.length > 0) {
       const newForms = {}
-      selectedTxIds.forEach(txId => {
-        const tx = transactions.find(t => t.id === txId)
-        if (tx) {
-          // Always create form if it doesn't exist
-          if (!receiptForms[txId]) {
-            newForms[txId] = {
+      
+      // First try to use real transaction data from TransactionsPage
+      if (selectedTxData && selectedTxData.length > 0) {
+        selectedTxData.forEach(tx => {
+          if (!receiptForms[tx.id]) {
+            newForms[tx.id] = {
               service: tx.description || '',
-              clientName: tx.sender || '',
+              clientName: tx.merchant || tx.sender || '',
               clientType: 'individual'
             }
           }
-        }
-      })
+        })
+        console.log('RECEIPTS: Initialized forms from real transaction data:', Object.keys(newForms).length)
+      } else {
+        // Fallback to local transaction array
+        selectedTxIds.forEach(txId => {
+          const tx = transactions.find(t => t.id === txId)
+          if (tx) {
+            if (!receiptForms[txId]) {
+              newForms[txId] = {
+                service: tx.description || '',
+                clientName: tx.sender || '',
+                clientType: 'individual'
+              }
+            }
+          }
+        })
+        console.log('RECEIPTS: Initialized forms for', Object.keys(newForms).length, 'transactions (local)')
+      }
+      
       if (Object.keys(newForms).length > 0) {
         setReceiptForms(prev => ({ ...prev, ...newForms }))
-        console.log('📝 RECEIPTS: Initialized forms for', Object.keys(newForms).length, 'transactions')
       }
     }
-  }, [selectedTxIds, transactions])
+  }, [selectedTxIds, selectedTxData, transactions])
 
   const formatAmount = (amount) => {
     return new Intl.NumberFormat('ru-RU', {
@@ -185,6 +215,14 @@ export function ReceiptsPage() {
   }
 
   const getTotalAmount = () => {
+    // First try with real transaction data
+    if (selectedTxData && selectedTxData.length > 0) {
+      return selectedTxData.reduce((sum, tx) => {
+        return sum + (tx.amount || 0)
+      }, 0)
+    }
+    
+    // Fallback to local transactions
     return selectedTxIds.reduce((sum, txId) => {
       const tx = transactions.find(t => t.id === txId)
       return sum + (tx?.amount || 0)
@@ -215,7 +253,7 @@ export function ReceiptsPage() {
   }
   
   const validateAllForms = () => {
-    console.log('🔍 VALIDATION: Checking forms...', {
+    console.log('VALIDATION: Checking forms...', {
       selectedTxIds: selectedTxIds.length,
       receiptFormsKeys: Object.keys(receiptForms).length,
       receiptForms: receiptForms
@@ -224,20 +262,25 @@ export function ReceiptsPage() {
     for (const txId of selectedTxIds) {
       const form = receiptForms[txId]
       if (!form) {
-        console.log('❌ VALIDATION: Missing form for txId', txId)
+        console.log('VALIDATION: Missing form for txId', txId)
         return false
       }
       if (!form.service.trim()) {
-        console.log('❌ VALIDATION: Empty service for txId', txId)
+        console.log('VALIDATION: Empty service for txId', txId)
         return false
       }
     }
-    console.log('✅ VALIDATION: All forms valid')
+    console.log('VALIDATION: All forms valid')
     return true
   }
 
   const handleCreateReceipts = (e) => {
     e.preventDefault()
+
+    console.log('CREATE RECEIPTS: Starting...', {
+      selectedTxIds: selectedTxIds.length,
+      receiptForms: Object.keys(receiptForms).length
+    })
 
     if (selectedTxIds.length === 0) {
       showToast('Please select transactions', 'error')
@@ -252,12 +295,22 @@ export function ReceiptsPage() {
     const newReceipts = []
     
     selectedTxIds.forEach(txId => {
-      const tx = transactions.find(t => t.id === txId)
+      console.log('CREATE RECEIPTS: Processing txId:', txId)
+      // First try to find in real transaction data, then fall back to local array
+      let tx = selectedTxData.find(t => t.id === txId)
+      if (!tx) {
+        tx = transactions.find(t => t.id === txId)
+      }
+      
       const form = receiptForms[txId]
+      
+      console.log('CREATE RECEIPTS: Found tx:', !!tx, 'Found form:', !!form, 'Form:', form)
       
       if (tx && form) {
         const taxAmount = calculateTax(tx.amount, form.clientType)
         const receiptId = `CHK-${Date.now()}-${txId}`
+        
+        console.log('CREATE RECEIPTS: Creating receipt:', receiptId)
         
         // Save service template for future use
         addServiceTemplate(form.service)
@@ -266,7 +319,7 @@ export function ReceiptsPage() {
           id: receiptId,
           date: new Date().toISOString().split('T')[0],
           service: form.service,
-          clientName: form.clientName || tx.sender || 'Not specified',
+          clientName: form.clientName || tx.merchant || tx.sender || 'Not specified',
           clientType: form.clientType,
           totalAmount: tx.amount,
           taxAmount,
@@ -279,7 +332,16 @@ export function ReceiptsPage() {
       }
     })
 
-    setReceipts([...newReceipts, ...receipts])
+    console.log('CREATE RECEIPTS: Created', newReceipts.length, 'receipts')
+    
+    setReceipts(prev => {
+      const updated = [...newReceipts, ...prev]
+      console.log('CREATE RECEIPTS: Total receipts after update:', updated.length)
+      // Save to localStorage immediately
+      localStorage.setItem('syntax_receipts', JSON.stringify(updated))
+      return updated
+    })
+    
     showToast(`${newReceipts.length} receipt(s) created successfully`, 'success')
     setReceiptForms({})
     setSelectedTxIds([])
@@ -290,30 +352,37 @@ export function ReceiptsPage() {
       r.id === receiptId ? { ...r, status: 'sent' } : r
     )
     setReceipts(updatedReceipts)
-    showToast('Receipt sent to tax service', 'success')
+    localStorage.setItem('syntax_receipts', JSON.stringify(updatedReceipts))
+    showToast('Чек отправлен налоговой службе', 'success')
   }
 
   const deleteReceipt = (receiptId) => {
-    setReceipts(receipts.filter(r => r.id !== receiptId))
-    showToast('Receipt deleted', 'success')
+    const updatedReceipts = receipts.filter(r => r.id !== receiptId)
+    setReceipts(updatedReceipts)
+    localStorage.setItem('syntax_receipts', JSON.stringify(updatedReceipts))
+    showToast('Чек удален', 'success')
   }
   
   // Bulk selection functions
   const toggleReceiptSelection = (receiptId) => {
-    setSelectedReceiptIds(prev => 
-      prev.includes(receiptId) 
-        ? prev.filter(id => id !== receiptId)
-        : [...prev, receiptId]
-    )
+    setSelectedReceiptIds(prev => {
+      const updated = new Set(prev)
+      if (updated.has(receiptId)) {
+        updated.delete(receiptId)
+      } else {
+        updated.add(receiptId)
+      }
+      return updated
+    })
   }
   
   const selectAllInCategory = () => {
     const filteredIds = filteredReceipts.map(r => r.id)
-    setSelectedReceiptIds(filteredIds)
+    setSelectedReceiptIds(new Set(filteredIds))
   }
   
   const deselectAll = () => {
-    setSelectedReceiptIds([])
+    setSelectedReceiptIds(new Set())
   }
   
   const toggleBulkMode = () => {
@@ -325,51 +394,149 @@ export function ReceiptsPage() {
   
   // Bulk operations
   const bulkSendReceipts = async () => {
-    if (selectedReceiptIds.length === 0) {
-      showToast('No receipts selected', 'warning')
+    if (selectedReceiptIds.size === 0) {
+      showToast('Нет выбранных чеков', 'warning')
       return
     }
     
     const updatedReceipts = receipts.map(r =>
-      selectedReceiptIds.includes(r.id) && r.status === 'draft'
+      selectedReceiptIds.has(r.id) && r.status === 'draft'
         ? { ...r, status: 'sent' }
         : r
     )
     setReceipts(updatedReceipts)
-    showToast(`${selectedReceiptIds.length} receipt(s) sent to tax service`, 'success')
+    localStorage.setItem('syntax_receipts', JSON.stringify(updatedReceipts))
+    showToast(`${selectedReceiptIds.size} чек(ов) отправлено в налоговою службу`, 'success')
     deselectAll()
     setBulkActionMode(false)
   }
   
   const bulkResendReceipts = async () => {
-    if (selectedReceiptIds.length === 0) {
-      showToast('No receipts selected', 'warning')
+    if (selectedReceiptIds.size === 0) {
+      showToast('Нет выбранных чеков', 'warning')
       return
     }
     
     const updatedReceipts = receipts.map(r =>
-      selectedReceiptIds.includes(r.id) && r.status === 'sent'
+      selectedReceiptIds.has(r.id) && r.status === 'sent'
         ? { ...r, status: 'sent', resentAt: new Date() }
         : r
     )
     setReceipts(updatedReceipts)
-    showToast(`${selectedReceiptIds.length} receipt(s) resent`, 'success')
+    localStorage.setItem('syntax_receipts', JSON.stringify(updatedReceipts))
+    showToast(`${selectedReceiptIds.size} чек(ов) отправлено повторно`, 'success')
     deselectAll()
     setBulkActionMode(false)
   }
   
   const bulkDeleteReceipts = () => {
-    if (selectedReceiptIds.length === 0) {
-      showToast('No receipts selected', 'warning')
+    if (selectedReceiptIds.size === 0) {
+      showToast('Нет выбранных чеков', 'warning')
       return
     }
     
-    if (window.confirm(`Delete ${selectedReceiptIds.length} receipt(s)? This action cannot be undone.`)) {
-      setReceipts(receipts.filter(r => !selectedReceiptIds.includes(r.id)))
-      showToast(`${selectedReceiptIds.length} receipt(s) deleted`, 'success')
+    if (window.confirm(`Удалить ${selectedReceiptIds.size} чек(ов)? Это действие нельзя отменить.`)) {
+      const updatedReceipts = receipts.filter(r => !selectedReceiptIds.has(r.id))
+      setReceipts(updatedReceipts)
+      localStorage.setItem('syntax_receipts', JSON.stringify(updatedReceipts))
+      showToast(`${selectedReceiptIds.size} чек(ов) удалено`, 'success')
       deselectAll()
       setBulkActionMode(false)
     }
+  }
+  
+  // Functions for splitting receipts
+  const startSplitReceipt = (receiptId) => {
+    const receipt = receipts.find(r => r.id === receiptId)
+    if (!receipt) return
+    
+    setSplitReceiptMode(receiptId)
+    // Initialize split services with current service as one item
+    setSplitServices({
+      [receiptId]: [{
+        name: receipt.service,
+        amount: receipt.totalAmount
+      }]
+    })
+  }
+  
+  const addSplitService = (receiptId) => {
+    setSplitServices(prev => ({
+      ...prev,
+      [receiptId]: [
+        ...prev[receiptId],
+        { name: '', amount: 0 }
+      ]
+    }))
+  }
+  
+  const removeSplitService = (receiptId, index) => {
+    setSplitServices(prev => ({
+      ...prev,
+      [receiptId]: prev[receiptId].filter((_, i) => i !== index)
+    }))
+  }
+  
+  const updateSplitService = (receiptId, index, field, value) => {
+    setSplitServices(prev => {
+      const updated = [...prev[receiptId]]
+      if (field === 'amount') {
+        updated[index][field] = parseFloat(value) || 0
+      } else {
+        updated[index][field] = value
+      }
+      return { ...prev, [receiptId]: updated }
+    })
+  }
+  
+  const getSplitTotal = (receiptId) => {
+    const services = splitServices[receiptId] || []
+    return services.reduce((sum, s) => sum + s.amount, 0)
+  }
+  
+  const validateSplitReceipt = (receiptId) => {
+    const receipt = receipts.find(r => r.id === receiptId)
+    const services = splitServices[receiptId] || []
+    
+    if (services.length === 0) {
+      showToast('Добавьте хотя бы одну услугу', 'error')
+      return false
+    }
+    
+    if (services.some(s => !s.name.trim())) {
+      showToast('Укажите название для всех услуг', 'error')
+      return false
+    }
+    
+    const total = getSplitTotal(receiptId)
+    if (Math.abs(total - receipt.totalAmount) > 0.01) {
+      showToast(`Сумма услуг (${total.toFixed(2)}) должна равняться ${receipt.totalAmount.toFixed(2)}`, 'error')
+      return false
+    }
+    
+    return true
+  }
+  
+  const confirmSplitReceipt = (receiptId) => {
+    if (!validateSplitReceipt(receiptId)) return
+    
+    const receipt = receipts.find(r => r.id === receiptId)
+    const services = splitServices[receiptId]
+    
+    // Update receipt with split services info
+    const updatedReceipt = {
+      ...receipt,
+      services: services,
+      isSplit: services.length > 1
+    }
+    
+    const updatedReceipts = receipts.map(r => r.id === receiptId ? updatedReceipt : r)
+    setReceipts(updatedReceipts)
+    localStorage.setItem('syntax_receipts', JSON.stringify(updatedReceipts))
+    
+    setSplitReceiptMode(null)
+    setSplitServices({})
+    showToast('Чек разделен на услуги', 'success')
   }
 
   const exportToCSV = () => {
@@ -417,25 +584,12 @@ export function ReceiptsPage() {
   return (
     <div className="receipts-page-wrapper">
       {/* Header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>RECEIPTS</h1>
-          <p>Create and manage tax receipts</p>
-        </div>
-        <div className="page-header-right">
-          <button className="btn-nav" onClick={() => navigate('/transactions')}>
-            📋 Transactions
-          </button>
-          <button className="btn-nav" onClick={() => navigate('/dashboard')}>
-            📊 Dashboard
-          </button>
-          <button className="btn-logout" onClick={() => {
-            logout()
-            navigate('/auth')
-          }}>
-            🚪 Logout
-          </button>
-        </div>
+      <Header />
+
+      {/* Page Title */}
+      <div className="page-title-section">
+        <h1>ЧЕКИ</h1>
+        <p className="header-subtitle">Создание и управление налоговыми чеками</p>
       </div>
 
       {/* Main Content */}
@@ -444,13 +598,17 @@ export function ReceiptsPage() {
         {selectedTxIds.length > 0 && (
           <div className="receipt-form-section">
             <div className="form-header">
-              <h2>Create New Receipts</h2>
-              <p className="form-subtitle">{selectedTxIds.length} transaction(s) selected • {selectedTxIds.length} receipt(s) will be created</p>
+              <h2>Создать новые чеки</h2>
+              <p className="form-subtitle">Выбрано {selectedTxIds.length} транзакц{selectedTxIds.length === 1 ? 'ия' : 'ий'} • Будет создано {selectedTxIds.length} чек{selectedTxIds.length === 1 ? '' : 'ов'}</p>
             </div>
             <form onSubmit={handleCreateReceipts} className="receipt-forms-container">
               {/* Individual Receipt Cards */}
               {selectedTxIds.map(txId => {
-                const tx = transactions.find(t => t.id === txId)
+                // First try to find in real transaction data, then fall back to local array
+                let tx = selectedTxData.find(t => t.id === txId)
+                if (!tx) {
+                  tx = transactions.find(t => t.id === txId)
+                }
                 const form = receiptForms[txId] || { service: '', clientName: '', clientType: 'individual' }
                 const txTax = calculateTax(tx?.amount || 0, form.clientType)
                 
@@ -459,22 +617,22 @@ export function ReceiptsPage() {
                     {/* Transaction Info */}
                     <div className="receipt-card-header">
                       <div className="tx-info">
-                        <span className="tx-date">📅 {tx.date}</span>
+                        <span className="tx-date">{tx.date}</span>
                         <span className="tx-amount">{formatAmount(tx.amount)}</span>
-                        <span className="tx-card">💳 •••• {tx.card}</span>
+                        <span className="tx-card">•••• {tx.card}</span>
                       </div>
                     </div>
 
                     {/* Form Fields */}
                     <div className="receipt-card-body">
                       <div className="form-group">
-                        <label>Service Description *</label>
+                        <label>Описание услуги *</label>
                         <input
                           type="text"
                           list={`services-${txId}`}
                           value={form.service}
                           onChange={(e) => updateReceiptForm(txId, 'service', e.target.value)}
-                          placeholder="Start typing... (e.g., Consultation, Development)"
+                          placeholder="Консультация, разработка, дизайн..."
                           required
                           className={form.service === tx.description ? 'autofilled' : ''}
                         />
@@ -484,33 +642,33 @@ export function ReceiptsPage() {
                           ))}
                         </datalist>
                         {savedServices.length === 0 && (
-                          <small className="hint">💡 Tip: Your service templates will appear here after first save</small>
+                          <small className="hint">Совет: ваши шаблоны услуг появятся здесь после первого сохранения</small>
                         )}
                       </div>
 
                       <div className="form-row">
                         <div className="form-group">
-                          <label>Client Name</label>
+                          <label>Имя клиента</label>
                           <input
                             type="text"
                             value={form.clientName}
                             onChange={(e) => updateReceiptForm(txId, 'clientName', e.target.value)}
-                            placeholder="Auto-filled from transaction"
-                            className={form.clientName === tx.sender ? 'autofilled' : ''}
+                            placeholder="Автоматически заполнится из транзакции"
+                            className={form.clientName === (tx.merchant || tx.sender) ? 'autofilled' : ''}
                           />
-                          {form.clientName === tx.sender && (
-                            <small className="autofill-badge">✨ Auto-filled from sender</small>
+                          {form.clientName === (tx.merchant || tx.sender) && (
+                            <small className="autofill-badge">Автоматически заполнено из транзакции</small>
                           )}
                         </div>
 
                         <div className="form-group">
-                          <label>Client Type</label>
+                          <label>Тип клиента</label>
                           <select
                             value={form.clientType}
                             onChange={(e) => updateReceiptForm(txId, 'clientType', e.target.value)}
                           >
-                            <option value="individual">Individual (4%)</option>
-                            <option value="company">Company (6%)</option>
+                            <option value="individual">Физ. лицо (4%)</option>
+                            <option value="company">Юр. лицо (6%)</option>
                           </select>
                         </div>
                       </div>
@@ -534,7 +692,7 @@ export function ReceiptsPage() {
                       {/* Validation Error */}
                       {!form.service.trim() && (
                         <div className="validation-error">
-                          ⚠️ Service description is required
+                          Описание услуги обязательно
                         </div>
                       )}
                     </div>
@@ -548,14 +706,14 @@ export function ReceiptsPage() {
                   setSelectedTxIds([])
                   setReceiptForms({})
                 }}>
-                  ← Cancel
+                  ← Отмена
                 </button>
                 <button 
                   type="submit" 
                   className="btn-primary-large"
                   disabled={!validateAllForms()}
                 >
-                  ✓ Create {selectedTxIds.length} Receipt(s)
+                  Создать {selectedTxIds.length} чек({selectedTxIds.length === 1 ? '' : 'ов'})
                 </button>
               </div>
             </form>
@@ -566,25 +724,25 @@ export function ReceiptsPage() {
         <div className="receipts-list-section">
           <div className="list-toolbar">
             <div className="list-toolbar-left">
-              <h2>My Receipts ({receipts.length})</h2>
+              <h2>Мои чеки ({receipts.length})</h2>
               <div className="filters">
                 <button
                   className={`filter-btn ${filterStatus === 'all' ? 'active' : ''}`}
                   onClick={() => setFilterStatus('all')}
                 >
-                  All ({receipts.length})
+                  Все ({receipts.length})
                 </button>
                 <button
                   className={`filter-btn ${filterStatus === 'sent' ? 'active' : ''}`}
                   onClick={() => setFilterStatus('sent')}
                 >
-                  Sent ({receipts.filter(r => r.status === 'sent').length})
+                  Отправленные ({receipts.filter(r => r.status === 'sent').length})
                 </button>
                 <button
                   className={`filter-btn ${filterStatus === 'draft' ? 'active' : ''}`}
                   onClick={() => setFilterStatus('draft')}
                 >
-                  Draft ({receipts.filter(r => r.status === 'draft').length})
+                  Черновики ({receipts.filter(r => r.status === 'draft').length})
                 </button>
               </div>
             </div>
@@ -593,10 +751,10 @@ export function ReceiptsPage() {
                 className={`btn-bulk ${bulkActionMode ? 'active' : ''}`}
                 onClick={toggleBulkMode}
               >
-                {bulkActionMode ? '✓ Cancel Bulk' : '☑ Bulk Actions'}
+                {bulkActionMode ? 'Отменить выделение' : 'Выбрать'}
               </button>
               <button className="btn-export" onClick={exportToCSV}>
-                📊 Export CSV
+                Экспорт CSV
               </button>
             </div>
           </div>
@@ -606,34 +764,34 @@ export function ReceiptsPage() {
             <div className="bulk-actions-bar">
               <div className="bulk-actions-left">
                 <button className="btn-select-all" onClick={selectAllInCategory}>
-                  Select All ({filteredReceipts.length})
+                  Выбрать все ({filteredReceipts.length})
                 </button>
                 <button className="btn-deselect" onClick={deselectAll}>
-                  Deselect All
+                  Снять выбор
                 </button>
                 <span className="selected-count">
-                  {selectedReceiptIds.length} selected
+                  Выбрано: {selectedReceiptIds.size}
                 </span>
               </div>
               
-              {selectedReceiptIds.length > 0 && (
+              {selectedReceiptIds.size > 0 && (
                 <div className="bulk-actions-right">
                   {/* Send button - only for drafts */}
-                  {receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'draft').length > 0 && (
+                  {receipts.filter(r => selectedReceiptIds.has(r.id) && r.status === 'draft').length > 0 && (
                     <button className="btn-bulk-send" onClick={bulkSendReceipts}>
-                      ✉️ Send ({receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'draft').length})
+                      ✉️ Отправить ({receipts.filter(r => selectedReceiptIds.has(r.id) && r.status === 'draft').length})
                     </button>
                   )}
                   
                   {/* Resend button - only for sent */}
-                  {receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'sent').length > 0 && (
+                  {receipts.filter(r => selectedReceiptIds.has(r.id) && r.status === 'sent').length > 0 && (
                     <button className="btn-bulk-resend" onClick={bulkResendReceipts}>
-                      🔄 Resend ({receipts.filter(r => selectedReceiptIds.includes(r.id) && r.status === 'sent').length})
+                      🔄 Отправить повторно ({receipts.filter(r => selectedReceiptIds.has(r.id) && r.status === 'sent').length})
                     </button>
                   )}
                   
                   <button className="btn-bulk-delete" onClick={bulkDeleteReceipts}>
-                    🗑️ Delete ({selectedReceiptIds.length})
+                    🗑️ Удалить ({selectedReceiptIds.size})
                   </button>
                 </div>
               )}
@@ -642,13 +800,13 @@ export function ReceiptsPage() {
 
           {filteredReceipts.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📭</div>
-              <p>{filterStatus === 'all' ? 'No receipts yet' : `No ${filterStatus} receipts`}</p>
+              <div className="empty-icon"></div>
+              <p>{filterStatus === 'all' ? 'Чеков еще нет' : `Нет ${filterStatus === 'sent' ? 'отправленных' : 'черновых'} чеков`}</p>
             </div>
           ) : (
             <div className="receipts-table">
               {filteredReceipts.map(receipt => (
-                <div key={receipt.id} className={`receipt-row ${selectedReceiptIds.includes(receipt.id) ? 'selected' : ''}`}>
+                <div key={receipt.id} className={`receipt-row ${selectedReceiptIds.has(receipt.id) ? 'selected' : ''}`}>
                   <div
                     className="receipt-row-main"
                     onClick={() => {
@@ -664,7 +822,7 @@ export function ReceiptsPage() {
                       <div className="receipt-checkbox" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          checked={selectedReceiptIds.includes(receipt.id)}
+                          checked={selectedReceiptIds.has(receipt.id)}
                           onChange={() => toggleReceiptSelection(receipt.id)}
                         />
                       </div>
@@ -688,31 +846,127 @@ export function ReceiptsPage() {
                   {/* Expanded Details */}
                   {expandedReceiptId === receipt.id && (
                     <div className="receipt-expanded">
-                      <div className="detail-grid">
-                        <div><span>ID:</span><code>{receipt.id}</code></div>
-                        <div><span>Service:</span><strong>{receipt.service}</strong></div>
-                        <div><span>Client:</span><strong>{receipt.clientName}</strong></div>
-                        <div><span>Type:</span><strong>{receipt.clientType}</strong></div>
-                        <div><span>Amount:</span><strong>{formatAmount(receipt.totalAmount)}</strong></div>
-                        <div><span>Tax:</span><strong>{formatAmount(receipt.taxAmount)}</strong></div>
-                      </div>
-                      <div className="expanded-buttons">
-                        {receipt.status === 'draft' && (
-                          <>
-                            <button className="btn-send" onClick={() => sendReceiptToTaxService(receipt.id)}>
-                              Send
-                            </button>
-                            <button className="btn-delete" onClick={() => deleteReceipt(receipt.id)}>
-                              Delete
-                            </button>
-                          </>
-                        )}
-                        {receipt.status === 'sent' && (
-                          <button className="btn-send" onClick={() => sendReceiptToTaxService(receipt.id)}>
-                            Resend
+                      {splitReceiptMode === receipt.id ? (
+                        // Split Services Mode
+                        <div className="split-receipt-mode">
+                          <h3>Разделение чека на услуги</h3>
+                          <p className="split-hint">Укажите наименование и стоимость каждой оказанной услуги</p>
+                          
+                          <div className="split-services-list">
+                            {(splitServices[receipt.id] || []).map((service, index) => (
+                              <div key={index} className="split-service-item">
+                                <div className="split-service-row">
+                                  <input
+                                    type="text"
+                                    placeholder="Наименование услуги"
+                                    value={service.name}
+                                    onChange={(e) => updateSplitService(receipt.id, index, 'name', e.target.value)}
+                                    className="service-name-input"
+                                  />
+                                  <div className="amount-input-group">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="Сумма"
+                                      value={service.amount || ''}
+                                      onChange={(e) => updateSplitService(receipt.id, index, 'amount', e.target.value)}
+                                      className="service-amount-input"
+                                    />
+                                    <span className="currency-label">₽</span>
+                                  </div>
+                                  {(splitServices[receipt.id]?.length || 0) > 1 && (
+                                    <button
+                                      className="btn-remove-service"
+                                      onClick={() => removeSplitService(receipt.id, index)}
+                                      title="Удалить услугу"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <div className="split-total-row">
+                            <span>Всего:</span>
+                            <strong className={getSplitTotal(receipt.id) === receipt.totalAmount ? 'valid' : 'invalid'}>
+                              {formatAmount(getSplitTotal(receipt.id))} / {formatAmount(receipt.totalAmount)}
+                            </strong>
+                          </div>
+                          
+                          <button
+                            className="btn-add-service"
+                            onClick={() => addSplitService(receipt.id)}
+                          >
+                            + Добавить ещё услугу
                           </button>
-                        )}
-                      </div>
+                          
+                          <div className="split-actions">
+                            <button
+                              className="btn-confirm-split"
+                              onClick={() => confirmSplitReceipt(receipt.id)}
+                              disabled={getSplitTotal(receipt.id) !== receipt.totalAmount}
+                            >
+                              Подтвердить разделение
+                            </button>
+                            <button
+                              className="btn-cancel-split"
+                              onClick={() => {
+                                setSplitReceiptMode(null)
+                                setSplitServices({})
+                              }}
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // Normal Details Mode
+                        <>
+                          <div className="detail-grid">
+                            <div><span>ID:</span><code>{receipt.id}</code></div>
+                            <div><span>Услуга:</span><strong>{receipt.service}</strong></div>
+                            <div><span>Клиент:</span><strong>{receipt.clientName}</strong></div>
+                            <div><span>Тип:</span><strong>{receipt.clientType}</strong></div>
+                            <div><span>Сумма:</span><strong>{formatAmount(receipt.totalAmount)}</strong></div>
+                            <div><span>Налог:</span><strong>{formatAmount(receipt.taxAmount)}</strong></div>
+                          </div>
+                          
+                          {receipt.isSplit && receipt.services && (
+                            <div className="split-services-summary">
+                              <strong>Разделено на услуги:</strong>
+                              {receipt.services.map((svc, idx) => (
+                                <div key={idx} className="service-summary-item">
+                                  {svc.name}: <strong>{formatAmount(svc.amount)}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          
+                          <div className="expanded-buttons">
+                            {receipt.status === 'draft' && (
+                              <>
+                                <button className="btn-split" onClick={() => startSplitReceipt(receipt.id)}>
+                                  ✂️ Разделить чек
+                                </button>
+                                <button className="btn-send" onClick={() => sendReceiptToTaxService(receipt.id)}>
+                                  Отправить
+                                </button>
+                                <button className="btn-delete" onClick={() => deleteReceipt(receipt.id)}>
+                                  Удалить
+                                </button>
+                              </>
+                            )}
+                            {receipt.status === 'sent' && (
+                              <button className="btn-send" onClick={() => sendReceiptToTaxService(receipt.id)}>
+                                Отправить повторно
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

@@ -107,6 +107,11 @@ class TaxPayment(SQLModel, table=True):
         description="Bank account ID used for payment"
     )
     
+    account_identification: Optional[str] = Field(
+        default=None,
+        description="Account identification number from nested account array (real account number for payments)"
+    )
+    
     bank_name: Optional[str] = Field(
         default=None,
         index=True,
@@ -116,6 +121,11 @@ class TaxPayment(SQLModel, table=True):
     consent_id: Optional[str] = Field(
         default=None,
         description="Payment consent ID from OpenBanking API"
+    )
+    
+    payment_request_id: Optional[str] = Field(
+        default=None,
+        description="Payment request ID (pcr-...) for pending manual approval (VBank/SBank)"
     )
     
     payment_id: Optional[str] = Field(

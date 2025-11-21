@@ -1,0 +1,138 @@
+/* Header Styles */
+
+.header-wrapper {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E0E0E0;
+  padding: 12px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 30px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-btn {
+  padding: 8px 16px;
+  border: 2px solid #E0E0E0;
+  border-radius: 6px;
+  background: #FFFFFF;
+  color: #666;
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.header-btn:hover {
+  border-color: #FFD700;
+  color: #1A2233;
+  transform: translateY(-1px);
+}
+
+.header-back {
+  background: #F0F0F0;
+}
+
+.header-back:hover {
+  background: #E0E0E0;
+}
+
+.header-transactions {
+  background: #E3F2FD;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.header-transactions:hover {
+  background: #BBDEFB;
+  border-color: #1E88E5;
+  color: #1E88E5;
+}
+
+.header-receipts {
+  background: #F3E5F5;
+  border-color: #9c27b0;
+  color: #9c27b0;
+}
+
+.header-receipts:hover {
+  background: #E1BEE7;
+  border-color: #7B1FA2;
+  color: #7B1FA2;
+}
+
+.header-tax {
+  background: #FFF3E0;
+  border-color: #ff9800;
+  color: #ff9800;
+}
+
+.header-tax:hover {
+  background: #FFE0B2;
+  border-color: #F57C00;
+  color: #F57C00;
+}
+
+.header-settings {
+  background: #FFFEF5;
+  border-color: #FFD700;
+  color: #FFB800;
+}
+
+.header-settings:hover {
+  background: #FFFBF0;
+  border-color: #FFA500;
+  color: #FF9800;
+}
+
+.header-banks {
+  background: #FFFEF5;
+  border-color: #FFD700;
+  color: #FFB800;
+}
+
+.header-banks:hover {
+  background: #FFFBF0;
+  border-color: #FFA500;
+  color: #FF9800;
+}
+
+.header-logout {
+  background: #FFF5F5;
+  border-color: #FF6B6B;
+  color: #C62828;
+}
+
+.header-logout:hover {
+  background: #FFEBEE;
+  border-color: #FF6B6B;
+  color: #B71C1C;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-container {
+    padding: 0 15px;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .header-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+}

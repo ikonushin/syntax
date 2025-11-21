@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import axios from 'axios'
 
 // Create Auth Context
 const AuthContext = createContext(null)
@@ -14,16 +15,20 @@ export function AuthProvider({ children }) {
   // Load auth data from localStorage on mount
   useEffect(() => {
     const storedAuth = localStorage.getItem('syntax_auth')
-    if (storedAuth) {
+    const storedToken = localStorage.getItem('accessToken')
+    
+    if (storedAuth && storedToken) {
       try {
         const parsed = JSON.parse(storedAuth)
         setUser(parsed.user)
-        setAccessToken(parsed.accessToken)
+        setAccessToken(storedToken)
         setSelectedUserIndex(parsed.selectedUserIndex)
         setSelectedBank(parsed.selectedBank)
+        console.log('AUTH: Restored session from localStorage')
       } catch (err) {
-        console.error('❌ AUTH: Failed to parse stored auth:', err)
+        console.error('AUTH: Failed to parse stored auth:', err)
         localStorage.removeItem('syntax_auth')
+        localStorage.removeItem('accessToken')
       }
     }
     setIsLoading(false)
@@ -34,17 +39,21 @@ export function AuthProvider({ children }) {
     if (user && accessToken) {
       const authData = {
         user,
-        accessToken,
         selectedUserIndex,
         selectedBank
       }
       localStorage.setItem('syntax_auth', JSON.stringify(authData))
+      localStorage.setItem('accessToken', accessToken)
+      
+      // Set JWT in axios default headers
+      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`
     }
   }, [user, accessToken, selectedUserIndex, selectedBank])
 
   const login = (userData, token) => {
     setUser(userData)
     setAccessToken(token)
+    console.log('AUTH: User logged in with JWT')
   }
 
   const logout = () => {
@@ -53,6 +62,15 @@ export function AuthProvider({ children }) {
     setSelectedUserIndex(null)
     setSelectedBank(null)
     localStorage.removeItem('syntax_auth')
+    localStorage.removeItem('accessToken')
+    
+    // Remove JWT from axios headers
+    try {
+      delete axios.defaults.headers.common['Authorization']
+    } catch (err) {
+      // axios not yet loaded
+    }
+    console.log('AUTH: User logged out')
   }
 
   const isAuthenticated = () => {
@@ -64,6 +82,17 @@ export function AuthProvider({ children }) {
     setSelectedBank(bankId)
   }
 
+  const selectUserBank = (userIdx, bankId) => {
+    setSelectedUserIndex(userIdx)
+    setSelectedBank(bankId)
+  }
+
+  const refreshToken = async (newToken) => {
+    setAccessToken(newToken)
+    localStorage.setItem('accessToken', newToken)
+    console.log('AUTH: Token refreshed')
+  }
+
   const value = {
     user,
     accessToken,
@@ -73,7 +102,9 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     logout,
-    selectBank
+    selectBank,
+    selectUserBank,
+    refreshToken
   }
 
   return (

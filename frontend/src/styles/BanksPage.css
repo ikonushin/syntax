@@ -1,5 +1,8 @@
 /* Banks Page Styles */
 
+@import './PageShared.css';
+@import './Header.css';
+
 .banks-wrapper {
   min-height: 100vh;
   background: #FFFFFF;
@@ -13,6 +16,10 @@
   padding: 20px 30px;
   background: #FFFFFF;
   border-bottom: 2px solid #FFD700;
+}
+
+.banks-header-left {
+  flex: 1;
 }
 
 .banks-header h1 {
@@ -153,6 +160,133 @@
   to {
     opacity: 1;
   }
+}
+
+/* SBank Approval Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 34, 51, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 30px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(26, 34, 51, 0.25);
+}
+
+.modal-content h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A2233;
+  margin: 0 0 15px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-content p {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.modal-info {
+  background: #F5F5F5;
+  border-left: 4px solid #FF6F00;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.modal-info p {
+  font-size: 12px;
+  margin: 0 0 8px 0;
+  word-break: break-all;
+}
+
+.modal-info p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-info strong {
+  color: #1A2233;
+}
+
+.modal-info a {
+  color: #1A73E8;
+  text-decoration: none;
+}
+
+.modal-info a:hover {
+  text-decoration: underline;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 25px;
+}
+
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.btn-primary {
+  background: #2E7D32;
+  color: #FFFFFF;
+}
+
+.btn-primary:hover {
+  background: #1B5E20;
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+}
+
+.btn-secondary {
+  background: #F0F0F0;
+  color: #1A2233;
+  border: 1px solid #D0D0D0;
+}
+
+.btn-secondary:hover {
+  background: #E0E0E0;
+}
+
+.btn-logout {
+  padding: 10px 20px;
+  background: #F0F0F0;
+  border: 1px solid #D0D0D0;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background: #E0E0E0;
 }
 
 @media (max-width: 768px) {

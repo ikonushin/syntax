@@ -55,10 +55,11 @@ docker-compose up --build
 
 ### OpenBanking Consent Flow
 
-1. **Request VBank consent (auto-approved):**
+1. **Request VBank consent (manual approval):**
 ```bash
 curl -X POST "http://localhost:8000/v1/consents/request?bank_name=vbank&client_id=team286-1"
-# Response: { "status": "authorized", "consent_id": "...", ... }
+# Response: { "status": "awaitingAuthorization", "consent_id": "...", ... }
+# Note: Background polling will check for approval periodically
 ```
 
 2. **Request SBank consent (manual approval):**
@@ -66,6 +67,12 @@ curl -X POST "http://localhost:8000/v1/consents/request?bank_name=vbank&client_i
 curl -X POST "http://localhost:8000/v1/consents/request?bank_name=sbank&client_id=team286-1"
 # Response: { "status": "awaitingAuthorization", "consent_id": "...", ... }
 # Note: Background polling will check for approval periodically
+```
+
+3. **Request ABank consent (auto-approved):**
+```bash
+curl -X POST "http://localhost:8000/v1/consents/request?bank_name=abank&client_id=team286-1"
+# Response: { "status": "authorized", "consent_id": "...", ... }
 ```
 
 3. **List all consents:**
@@ -129,8 +136,8 @@ curl -X GET "http://localhost:8000/v1/accounts/123456/transactions?date_from=202
 
 ### Consent Management (OpenBanking)
 * `POST /v1/consents/request?bank_name={vbank|abank|sbank}&client_id={id}` — Request bank consent
-  - VBank, ABank: Immediately approved
-  - SBank: Manual approval required with background polling
+  - ABank: Immediately approved
+  - VBank, SBank: Manual approval required with background polling
 * `GET /v1/consents/` — List all consents
 * `GET /v1/consents/{bank_name}` — List consents for specific bank
 * `GET /v1/consents/status/{consent_id}?bank_name={bank}` — Check consent status

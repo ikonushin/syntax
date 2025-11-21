@@ -1,9 +1,12 @@
 /* Tax Payments Page Styles */
 
+@import './PageShared.css';
+@import './Header.css';
+
 .tax-payments-page {
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
   background: #FFFFFF;
-  padding: 30px;
+  padding: 20px 30px 30px 30px;
   animation: fadeIn 0.5s ease-out;
 }
 
@@ -26,6 +29,12 @@
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 2px solid #F0F0F0;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .header-left h1 {
@@ -135,6 +144,27 @@
   color: #666;
 }
 
+/* Tax Sections */
+.tax-section {
+  margin-bottom: 40px;
+}
+
+.tax-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A2233;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 20px 0;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #FFD700;
+}
+
 /* Tax List */
 .tax-list {
   display: grid;
@@ -155,6 +185,17 @@
   border-color: #FFD700;
   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
   transform: translateY(-2px);
+}
+
+.tax-card.paid {
+  border-color: #4CAF50;
+  background: linear-gradient(135deg, #F8FFF5 0%, #FFFFFF 100%);
+  box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.3);
+}
+
+.tax-card.paid:hover {
+  border-color: #45a049;
+  box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.5), 0 4px 12px rgba(76, 175, 80, 0.2);
 }
 
 .tax-card-header {
@@ -265,37 +306,63 @@
   margin: 0;
 }
 
+.payment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  background: #E8F5E9;
+  border-radius: 6px;
+  border-left: 4px solid #4CAF50;
+}
+
 .payment-info,
 .error-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 10px;
-  background: #F0F0F0;
-  border-radius: 4px;
+  padding: 10px 0;
   font-size: 13px;
 }
 
 .payment-info {
-  background: #E8F5E9;
+  background: transparent;
+  border-radius: 0;
 }
 
 .error-info {
-  background: #FFEBEE;
+  background: transparent;
   color: #C62828;
+  border-radius: 0;
+  padding: 10px;
+  background: #FFEBEE;
+  flex-direction: row;
 }
 
 .info-label {
   font-weight: 600;
-  color: #666;
+  color: #2E7D32;
+  min-width: 120px;
+  flex-shrink: 0;
 }
 
 .info-value {
   color: #1A2233;
+  word-break: break-word;
+  flex: 1;
+}
+
+.payment-id {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: #F0F0F0;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .error-icon {
   font-size: 18px;
+  flex-shrink: 0;
 }
 
 .error-text {
@@ -605,6 +672,10 @@
     align-items: stretch;
   }
 
+  .header-left {
+    gap: 10px;
+  }
+
   .tax-list {
     grid-template-columns: 1fr;
   }
@@ -618,5 +689,18 @@
   .modal-body,
   .modal-footer {
     padding: 15px 20px;
+  }
+
+  .payment-details {
+    gap: 8px;
+  }
+
+  .payment-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .info-label {
+    min-width: auto;
   }
 }

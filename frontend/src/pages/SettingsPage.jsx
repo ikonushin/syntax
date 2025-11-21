@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Header } from '../components/Header';
 import '../styles/SettingsPage.css';
 
 /**
@@ -12,6 +14,7 @@ import '../styles/SettingsPage.css';
  */
 function SettingsPage() {
   const navigate = useNavigate();
+  const { selectedUserIndex, selectedBank } = useAuth();
   
   // Auto-receipt rules state
   const [autoReceiptRules, setAutoReceiptRules] = useState([]);
@@ -141,22 +144,39 @@ function SettingsPage() {
 
   return (
     <div className="settings-page">
-      <div className="page-header">
-        <div className="header-left">
-          <button className="btn-back" onClick={() => navigate('/dashboard')}>
-            ← Назад
-          </button>
-          <div>
-            <h1>⚙️ Настройки</h1>
-            <p className="header-subtitle">Управление автоматизацией и шаблонами</p>
-          </div>
-        </div>
+      <Header />
+      
+      <div className="page-title-section">
+        <h1>⚙️ Настройки</h1>
+        <p className="header-subtitle">Управление автоматизацией и шаблонами</p>
       </div>
 
       {successMessage && (
         <div className="alert alert-success">
           ✅ {successMessage}
         </div>
+      )}
+
+      {/* Current User Info */}
+      {selectedUserIndex && (
+        <section className="settings-section user-info-section">
+          <div className="user-info-card">
+            <div className="user-info-header">
+              <div className="user-info-icon">👤</div>
+              <div className="user-info-content">
+                <div className="user-info-label">Текущий пользователь</div>
+                <div className="user-info-value">
+                  {selectedBank?.toUpperCase()}{selectedUserIndex}
+                </div>
+                {selectedBank && (
+                  <div className="user-info-bank">
+                    Банк: <span className="bank-badge">{selectedBank.toUpperCase()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* Auto-receipt rules section */}

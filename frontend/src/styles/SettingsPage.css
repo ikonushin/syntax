@@ -1,5 +1,8 @@
 /* Settings Page Styles */
 
+@import './PageShared.css';
+@import './Header.css';
+
 .settings-page {
   min-height: 100vh;
   background: #FFFFFF;
@@ -90,6 +93,76 @@
   background: #E8F5E9;
   color: #2E7D32;
   border: 1px solid #A5D6A7;
+}
+
+/* User Info Section */
+.user-info-section {
+  background: linear-gradient(135deg, #E3F2FD 0%, #F3E5F5 100%);
+  border: 2px solid #9C27B0;
+  margin-bottom: 30px;
+}
+
+.user-info-card {
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border: 2px solid #E1BEE7;
+}
+
+.user-info-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.user-info-icon {
+  font-size: 40px;
+  min-width: 50px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.user-info-content {
+  flex: 1;
+}
+
+.user-info-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.user-info-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #9C27B0;
+  font-family: 'Oswald', sans-serif;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.user-info-bank {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.bank-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #E1BEE7;
+  color: #6A1B9A;
+  border-radius: 20px;
+  font-weight: 600;
+  margin-left: 6px;
+  font-size: 12px;
 }
 
 /* Settings Section */

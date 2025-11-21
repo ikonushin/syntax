@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { PrivateRoute } from './components/PrivateRoute'
@@ -9,6 +9,7 @@ import { ReceiptsPage } from './pages/ReceiptsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import TaxPaymentsPage from './pages/TaxPaymentsPage'
 import SettingsPage from './pages/SettingsPage'
+import api from './api/axiosConfig'
 import './styles/PageShared.css'
 import './index.css'
 
@@ -81,6 +82,15 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    // Initialize JWT in axios from localStorage
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      console.log('AUTH: JWT token loaded from localStorage')
+    }
+  }, [])
+
   return (
     <AuthProvider>
       <BrowserRouter>

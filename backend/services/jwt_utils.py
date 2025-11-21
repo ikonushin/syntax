@@ -21,7 +21,8 @@ def encode_token(
     access_token: str,
     client_id: str,
     expires_in: int,
-    bank_token_expires_in: Optional[int] = None
+    bank_token_expires_in: Optional[int] = None,
+    client_secret: Optional[str] = None
 ) -> str:
     """
     Encode a JWT token wrapping the bank access token.
@@ -31,6 +32,7 @@ def encode_token(
         client_id: Team/client ID
         expires_in: Original bank token expiry in seconds
         bank_token_expires_in: Optional bank token expiry override
+        client_secret: Client secret (for getting bank-specific tokens)
 
     Returns:
         str: Encoded JWT token
@@ -39,11 +41,14 @@ def encode_token(
     {
         "access_token": "bank_token_here",
         "client_id": "team286",
+        "client_secret": "secret_here",
         "token_type": "bearer",
         "expires_in": 3600,
         "iat": timestamp,
         "exp": timestamp (30 min from now)
     }
+    
+    Note: Client secret allows getting bank-specific tokens when switching banks
     """
     now = datetime.utcnow()
     payload = {
@@ -54,6 +59,10 @@ def encode_token(
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=JWT_EXPIRY_MINUTES)).timestamp())
     }
+    
+    # Store client_secret for bank-specific token requests
+    if client_secret:
+        payload["client_secret"] = client_secret
 
     try:
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

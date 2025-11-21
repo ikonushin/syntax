@@ -12,13 +12,13 @@ class Consent(SQLModel, table=True):
     Tracks authorization status for each bank and client.
     Status values: 
     - pending: Initial state, awaiting bank response
-    - awaitingAuthorization: Pending user signature (SBank manual approval)
+    - awaitingAuthorization: Pending user signature (SBank/VBank manual approval)
     - authorized: Approved and active
     - revoked: Revoked by user
     
     Flow:
-    - VBank/ABank: pending → authorized (auto-approved)
-    - SBank: pending → awaitingAuthorization → authorized (manual approval)
+    - ABank: pending → authorized (auto-approved)
+    - SBank/VBank: pending → awaitingAuthorization → authorized (manual approval)
     """
     id: UUID = Field(
         default_factory=uuid4,
@@ -40,7 +40,7 @@ class Consent(SQLModel, table=True):
     request_id: Optional[str] = Field(
         default=None,
         index=True,
-        description="Request ID for SBank manual approval flow (before signing)"
+        description="Request ID for SBank/VBank manual approval flow (before signing)"
     )
     status: str = Field(
         default="pending",
@@ -48,7 +48,7 @@ class Consent(SQLModel, table=True):
     )
     redirect_uri: Optional[str] = Field(
         default=None,
-        description="Redirect URL for SBank manual approval in bank UI"
+        description="Redirect URL for SBank/VBank manual approval in bank UI"
     )
     expires_at: Optional[datetime] = Field(
         default=None,

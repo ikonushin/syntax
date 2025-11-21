@@ -165,18 +165,35 @@ async def authenticate_team(client_id: str, client_secret: str) -> Tuple[str, in
             )
 
 
-async def authenticate_with_bank(client_id: str, client_secret: str) -> dict:
-    """Authenticate with bank API and return token."""
+async def authenticate_with_bank(client_id: str, client_secret: str, bank_id: str = None) -> dict:
+    """Authenticate with bank API and return token.
+    
+    Args:
+        client_id: Client ID for authentication
+        client_secret: Client secret for authentication
+        bank_id: Bank identifier (vbank, sbank, abank). If None, uses BASE_URL from env.
+    
+    Returns:
+        Bank API response with access_token and expiry info
+    """
     logger = logging.getLogger(__name__)
     
+    # Если передан bank_id, используем специфичный URL банка
+    if bank_id:
+        bank_url = f"https://{bank_id}.open.bankingapi.ru"
+        logger.info(f"🔍 SERVICE DEBUG: Using bank-specific URL: {bank_url}")
+    else:
+        bank_url = BASE_URL
+        logger.info(f"🔍 SERVICE DEBUG: Using default BASE_URL: {bank_url}")
+    
     logger.info(f"🔍 SERVICE DEBUG: authenticate_with_bank called")
+    logger.info(f"🔍 SERVICE DEBUG: bank_id = '{bank_id}'")
     logger.info(f"🔍 SERVICE DEBUG: client_id = '{client_id}'")
     logger.info(f"🔍 SERVICE DEBUG: client_secret length = {len(client_secret)}")
-    logger.info(f"🔍 SERVICE DEBUG: BASE_URL = {BASE_URL}")
     
     try:
         async with httpx.AsyncClient() as client:
-            url = f"{BASE_URL}/auth/bank-token"
+            url = f"{bank_url}/auth/bank-token"
             params = {
                 "client_id": client_id,
                 "client_secret": client_secret

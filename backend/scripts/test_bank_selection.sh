@@ -21,12 +21,12 @@ echo ""
 echo "2️⃣ Testing consent endpoints with different banks..."
 
 # Test VBank
-echo "   Testing VBank (Auto-approve)..."
+echo "   Testing VBank (Manual approval)..."
 VBANK=$(curl -s -X POST "http://localhost:8000/v1/consents/request?bank_name=vbank&client_id=team286-1" | jq -r '.status' 2>/dev/null)
-if [ "$VBANK" == "authorized" ]; then
+if [ "$VBANK" == "awaitingAuthorization" ]; then
     echo "   ✅ VBank: Status = $VBANK"
 else
-    echo "   ⚠️ VBank: Status = $VBANK (expected: authorized)"
+    echo "   ⚠️ VBank: Status = $VBANK (expected: awaitingAuthorization)"
 fi
 
 # Test ABank
